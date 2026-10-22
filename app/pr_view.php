@@ -104,6 +104,20 @@ render_header($pr['number']); ?>
 </div>
 <?php endif; ?>
 
+<?php if (in_array($pr['status'], ['approved'], true) && (has_role('procurement') || has_role('admin'))):
+    $method = proc_method_for(pr_total($lines)); ?>
+<div class="card noprint" style="border-color:var(--brand)">
+  <h2>Procurement method</h2>
+  <?php if ($method): ?>
+    <p style="margin:0">Total <?= number_format(pr_total($lines), 2) ?> <?= e($pr['currency']) ?> → <b><?= e($method['name']) ?></b>:
+      at least <b><?= (int)$method['min_quotes'] ?> quote<?= (int)$method['min_quotes'] > 1 ? 's' : '' ?></b><?= $method['sealed'] ? ', submitted as <b>sealed bids</b> through supplier links' : ', entered by the procurement officer' ?>.</p>
+    <p class="muted" style="margin-bottom:0">Creating the RFQ from this request is the next build step.</p>
+  <?php else: ?>
+    <p class="flash warn" style="margin:0">No procurement method covers this amount. An Administrator must set up <a href="methods.php">Procurement methods</a>.</p>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
 <div class="card">
   <div class="print-only" style="margin-bottom:10px"><b><?= e(setting('org_name')) ?></b> · Purchase Request <?= e($pr['number']) ?> · <?= e(PR_STATUS[$pr['status']][0]) ?></div>
   <div class="row">

@@ -52,6 +52,8 @@ render_header('Dashboard'); ?>
       ['Approval thresholds by amount (optional)', (int)q('SELECT COUNT(*) FROM approval_levels WHERE active = 1')->fetchColumn() > 0, 'approvals.php'],
       ['Item categories created', $c['cats'] > 0, 'categories.php'],
       ['Item catalogue entered or imported', $c['items'] > 0, 'items.php'],
+      ['Procurement methods by amount', (int)q('SELECT COUNT(*) FROM proc_methods WHERE active = 1')->fetchColumn() > 0, 'methods.php'],
+      ['Suppliers entered or imported', (int)q("SELECT COUNT(*) FROM suppliers WHERE status = 'active'")->fetchColumn() > 0, 'suppliers.php'],
       ['Users invited', $c['users'] > 1, 'users.php'],
     ];
     foreach ($steps as [$label, $ok, $href]): ?>

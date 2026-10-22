@@ -124,6 +124,29 @@ function demo_seed(PDO $pdo): void {
     // Approval threshold: above 5,000 USD the Country Director (Alex) approves after the Budget Holder
     $ins('INSERT INTO approval_levels (name, min_amount, approver_user_id) VALUES (?, ?, ?)', ['Country Director', 5000, $uid['admin']]);
 
+    // Procurement methods and suppliers
+    foreach ([['Single quotation', 1000, 1, 0], ['Request for quotations (RFQ)', 25000, 3, 1], ['Open tender', null, 3, 1]] as $m) {
+        $ins('INSERT INTO proc_methods (name, max_amount, min_quotes, sealed) VALUES (?, ?, ?, ?)', $m);
+    }
+    $catId = fn(string $c) => (int)$pdo->query('SELECT id FROM categories WHERE code = ' . $pdo->quote($c))->fetchColumn();
+    foreach ([
+        ['Savannah Office Supplies Ltd', 'Grace Wanjiru', 'Nairobi', ['STAT', 'ITC', 'FURN']],
+        ['Rift Valley Computers', 'David Otieno', 'Nairobi', ['IT', 'ITC', 'TEL']],
+        ['Lakeside Hygiene & Relief', 'Amina Hassan', 'Kisumu', ['CLN', 'CAMP', 'MEDC']],
+        ['Coastline Motors', 'Peter Mwangi', 'Mombasa', ['VEH', 'SPR', 'LUB']],
+        ['Northern Frontier Traders', 'Abdi Noor', 'Garissa', ['CAMP', 'CONS', 'HTL', 'FOOD']],
+        ['PowerGen East Africa', 'Lucy Achieng', 'Nairobi', ['GEN', 'TOOL', 'APPL']],
+        ['MediQuip Kenya', 'Dr. Samuel Kiprop', 'Nakuru', ['MED', 'MEDC', 'PPE']],
+        ['Turkana General Store', 'Joseph Ekai', 'Lodwar', ['CLN', 'FOOD', 'CAMP', 'STAT']],
+        ['SafeGuard Uniforms', 'Esther Njeri', 'Thika', ['UNI', 'PPE']],
+        ['Highland Hardware', 'Kevin Mutua', 'Eldoret', ['HTL', 'CONS', 'TOOL']],
+    ] as $i => [$nm, $contact, $city, $cc]) {
+        $slug = strtolower(preg_replace('/[^a-z]+/i', '', explode(' ', $nm)[0]));
+        $sid = $ins("INSERT INTO suppliers (code, name, contact_name, email, phone, address, country, registration_no, status) VALUES (?, ?, ?, ?, ?, ?, 'Kenya', ?, ?)",
+            ['SUP-' . str_pad((string)($i + 1), 4, '0', STR_PAD_LEFT), $nm, $contact, "sales@$slug.example", '+254 7' . str_pad((string)(10000000 + $i * 1234567), 8, '0'), $city, 'P05' . (1000000 + $i * 7919) . 'K', $i === 8 ? 'blacklisted' : 'active']);
+        foreach ($cc as $c) if ($cid = $catId($c)) $ins('INSERT INTO supplier_categories (supplier_id, category_id) VALUES (?, ?)', [$sid, $cid]);
+    }
+
     // Sample Purchase Requests, one per status
     $fid  = fn(string $code) => (int)$pdo->query('SELECT id FROM fin_values WHERE code = ' . $pdo->quote($code))->fetchColumn();
     $iid  = fn(string $code) => $pdo->query('SELECT id, unit FROM items WHERE code = ' . $pdo->quote($code))->fetch(PDO::FETCH_ASSOC);

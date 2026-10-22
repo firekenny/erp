@@ -12,12 +12,17 @@ function render_header(string $title): void {
         $prLabel = 'Purchase Requests';
         if (function_exists('pr_counts')) { $c = pr_counts($u); $n = $c['to_approve'] + $c['self_blocked'] + $c['returned']; if ($n) $prLabel .= " ($n)"; }
         $nav[] = [$prLabel, 'pr.php'];
+        if (has_role('procurement') || has_role('admin')) {
+            $nav[] = ['Procurement', null];
+            $nav[] = ['Suppliers', 'suppliers.php'];
+        }
         if (has_role('admin')) {
             $nav[] = ['Setup', null];
             $nav[] = ['Organisation', 'settings.php'];
             $nav[] = ['Users & roles', 'users.php'];
             $nav[] = ['Finance codes', 'finance.php'];
             $nav[] = ['Approval thresholds', 'approvals.php'];
+            $nav[] = ['Procurement methods', 'methods.php'];
             $nav[] = ['Item categories', 'categories.php'];
             $nav[] = ['Item catalogue', 'items.php'];
         }

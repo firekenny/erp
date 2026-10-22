@@ -6,7 +6,7 @@ declare(strict_types=1);
  * After each deploy, the app upgrades the database by itself on the next page load —
  * no manual SQL needed.
  */
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 function schema_migrations(): array {
     return [
@@ -153,6 +153,40 @@ function schema_migrations(): array {
                 CONSTRAINT fk_al_user FOREIGN KEY (approver_user_id) REFERENCES users(id) ON DELETE SET NULL
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
             "ALTER TABLE pr_approvals ADD COLUMN stage TINYINT NOT NULL DEFAULT 1, ADD COLUMN level_name VARCHAR(80) NULL",
+        ],
+        5 => [
+            // Supplier register
+            "CREATE TABLE IF NOT EXISTS suppliers (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                code VARCHAR(20) NOT NULL UNIQUE,
+                name VARCHAR(190) NOT NULL,
+                contact_name VARCHAR(120) NOT NULL DEFAULT '',
+                email VARCHAR(190) NOT NULL DEFAULT '',
+                phone VARCHAR(60) NOT NULL DEFAULT '',
+                address VARCHAR(255) NOT NULL DEFAULT '',
+                country VARCHAR(80) NOT NULL DEFAULT '',
+                registration_no VARCHAR(80) NOT NULL DEFAULT '',
+                status ENUM('active','inactive','blacklisted') NOT NULL DEFAULT 'active',
+                notes TEXT,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY ix_name (name)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS supplier_categories (
+                supplier_id INT NOT NULL,
+                category_id INT NOT NULL,
+                PRIMARY KEY (supplier_id, category_id),
+                CONSTRAINT fk_sc_s FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE CASCADE,
+                CONSTRAINT fk_sc_c FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            // Procurement methods by amount band
+            "CREATE TABLE IF NOT EXISTS proc_methods (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(80) NOT NULL,
+                max_amount DECIMAL(14,2) NULL,
+                min_quotes TINYINT NOT NULL DEFAULT 1,
+                sealed TINYINT(1) NOT NULL DEFAULT 0,
+                active TINYINT(1) NOT NULL DEFAULT 1
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         ],
     ];
 }

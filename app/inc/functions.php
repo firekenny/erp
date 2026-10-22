@@ -134,3 +134,21 @@ function send_csv(string $filename, array $header, array $rows = []): void {
 
 /* ---------- Finance helpers ---------- */
 function fin_levels(): array { return q('SELECT * FROM fin_levels ORDER BY position')->fetchAll(); }
+
+/* ---------- Access for several roles ---------- */
+function require_any(array $roles): array {
+    $u = require_login();
+    foreach ($roles as $r) if (has_role($r)) return $u;
+    http_response_code(403); render_header('Access denied'); echo '<div class="card"><p>You do not have access to this page.</p></div>'; render_footer(); exit;
+}
+
+/* ---------- Procurement methods ---------- */
+/** Active methods, smallest band first; the band with no upper limit comes last */
+function proc_methods(bool $activeOnly = true): array {
+    return q('SELECT * FROM proc_methods' . ($activeOnly ? ' WHERE active = 1' : '') . ' ORDER BY max_amount IS NULL, max_amount, id')->fetchAll();
+}
+/** Method that applies to an amount, or null if none is set up */
+function proc_method_for(float $amount): ?array {
+    foreach (proc_methods() as $m) if ($m['max_amount'] === null || $amount <= (float)$m['max_amount']) return $m;
+    return null;
+}
