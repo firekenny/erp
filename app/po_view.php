@@ -40,13 +40,12 @@ render_header($po['number']); ?>
 
 <?php if ($isProc && $po['status'] !== 'cancelled'): ?>
 <div class="card noprint">
-  <div class="row" style="align-items:flex-end">
-    <div style="flex:3"><span class="muted">Supplier link (view, print and acknowledge) · <?= e($po['email_status'] ?? 'not sent') ?></span><div class="copy"><?= e(po_link($po['token'])) ?></div></div>
-    <div style="flex:0;white-space:nowrap">
-      <button type="button" class="btn sec small" onclick="navigator.clipboard.writeText(this.closest('.row').querySelector('.copy').innerText);this.innerText='Copied'">Copy link</button>
-      <form method="post" style="display:inline"><?= csrf_field() ?><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="act" value="resend"><button class="btn sec small">Email to supplier</button></form>
-      <?php if (is_demo()): ?><a class="btn small" href="<?= e(po_link($po['token'])) ?>" target="_blank">Open as supplier</a><?php endif; ?>
-    </div>
+  <span class="muted">Supplier link (view, print and acknowledge) · <?= e($po['email_status'] ?? 'not sent') ?></span>
+  <div class="copy" id="polink"><?= e(po_link($po['token'])) ?></div>
+  <div class="actions" style="margin-top:8px">
+    <button type="button" class="btn sec small" onclick="navigator.clipboard.writeText(document.getElementById('polink').innerText);this.innerText='Copied'">Copy link</button>
+    <form method="post" style="display:inline"><?= csrf_field() ?><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="act" value="resend"><button class="btn sec small">Email to supplier</button></form>
+    <?php if (is_demo()): ?><a class="btn small" href="<?= e(po_link($po['token'])) ?>" target="_blank">Open as supplier</a><?php endif; ?>
   </div>
   <?php if ($po['acknowledged_at']): ?><p class="flash ok" style="margin:10px 0 0">Acknowledged by <?= e($po['acknowledged_name']) ?> on <?= e(date('d M Y H:i', strtotime($po['acknowledged_at']))) ?>.</p><?php endif; ?>
 </div>
