@@ -16,6 +16,8 @@ if (is_demo() && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['demo_rol
     redirect('login.php');
 }
 
+if (is_demo() && $_SERVER['REQUEST_METHOD'] === 'POST') redirect('login.php');   // demo: one-click accounts only
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = strtolower(trim((string)($_POST['email'] ?? '')));
     $pw = (string)($_POST['password'] ?? '');
@@ -46,8 +48,7 @@ if (is_demo()): ?>
     <?php endforeach; ?>
   </form>
 </div>
-<details class="card"><summary>Sign in with an email and password</summary>
-<?php endif; ?>
+<?php render_footer(); exit; endif; ?>
 <form method="post" class="card">
   <?= csrf_field() ?>
   <label>Email</label><input type="email" name="email" value="<?= e($email) ?>" required autofocus>
@@ -55,5 +56,4 @@ if (is_demo()): ?>
   <div class="actions"><button class="btn">Sign in</button></div>
   <p class="muted">Forgot your password? Ask your administrator for a new access link.</p>
 </form>
-<?php if (is_demo()): ?></details><?php endif; ?>
 <?php render_footer();

@@ -19,7 +19,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($t && is_demo_account($t)) { flash('The four demo accounts cannot be changed. Add your own test user instead.', 'warn'); redirect('users.php'); }
     }
 
-    if ($act === 'invite') {
+    if ($act === 'invite' && is_demo()) {
+        flash('Adding users is disabled in the demo: use the four demo roles instead.', 'warn');
+    } elseif ($act === 'invite') {
         $name  = trim((string)($_POST['name'] ?? ''));
         $email = strtolower(trim((string)($_POST['email'] ?? '')));
         $roles = clean_roles((array)($_POST['roles'] ?? []));
@@ -81,6 +83,9 @@ if ($link): ?>
 </div>
 <?php endif; ?>
 
+<?php if (is_demo()): ?>
+<div class="flash warn">In the demo, adding users is disabled. In a real installation, the Administrator adds each colleague here and sends them a personal link to choose their password.</div>
+<?php else: ?>
 <div class="card">
   <h2>Add a user</h2>
   <form method="post">
@@ -98,6 +103,7 @@ if ($link): ?>
     <div class="actions"><button class="btn">Add user and create access link</button></div>
   </form>
 </div>
+<?php endif; ?>
 
 <div class="table-wrap">
 <table>
