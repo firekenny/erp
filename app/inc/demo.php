@@ -13,6 +13,7 @@ const DEMO_ACCOUNTS = [
     'budget_holder' => ['Ben Budget Holder', 'requester,budget_holder',  'Approves Purchase Requests for his cost centres'],
     'procurement'   => ['Paula Procurement', 'procurement',              'Runs RFQs, awards and Purchase Orders'],
     'storekeeper'   => ['Sam Storekeeper',   'storekeeper',              'Receives deliveries into stock and the asset register'],
+    'finance'       => ['Fiona Finance',     'finance',                  'Records supplier invoices, checks the 3-way match and records payments'],
 ];
 
 function is_demo(): bool { return defined('DEMO_MODE') && DEMO_MODE; }
@@ -268,6 +269,47 @@ function demo_seed(PDO $pdo): void {
              [$poId, $l['line_no'], $l['id'], $l['item_id'], $l['description'], $l['specification'], $l['line_no'] == 1 ? 'Motorola DP1400' : 'SanDisk Ultra', $l['qty'], $l['unit'], $l['unit_price'], $l['fin1_id'], $l['fin2_id'], $l['fin3_id']]);
     }
     $ins("INSERT INTO po_history (po_id, user_id, action, comment) VALUES (?, ?, 'issued', 'Single quotation')", [$poId, $uid['procurement']]);
+
+    // A second order, fully received, with two supplier invoices: one ready to pay, one on hold (price above the PO)
+    $mk('requester', 'Soap and blankets top-up for Lodwar store', 'approved', 'ECHO', 'ECH-TUR',
+        [['CLN-0001', '', 2000, 0.40, '5030'], ['CAMP-0003', 'Fleece, 150 x 200 cm', 100, 6.00, '5030']],
+        ['budget_holder', 'approved', '', 'budget_holder'], 'Lodwar field store', 15);
+    $prB = (int)$pdo->query("SELECT MAX(id) FROM pr")->fetchColumn();
+    $pdo->prepare("UPDATE pr SET status = 'ordered' WHERE id = ?")->execute([$prB]);
+    $po2 = $ins("INSERT INTO po (number, pr_id, supplier_id, currency, delivery_location, delivery_date, payment_terms, terms, status, token, created_by, created_at, acknowledged_at, acknowledged_name, email_status)
+                 VALUES (?, ?, ?, 'USD', 'Lodwar field store', ?, 'Payment within 30 days of receipt of goods and a valid invoice quoting this PO number.', ?, 'received', ?, ?, ?, ?, 'Mary Njeri, Accounts', 'Demo: emails are never sent')",
+        ["PO-$year-0002", $prB, $sup('SUP-0003'), date('Y-m-d', strtotime('-6 days')), function_exists('default_po_terms') ? default_po_terms() : 'Standard terms and conditions apply.',
+         bin2hex(random_bytes(24)), $uid['procurement'], date('Y-m-d H:i:s', strtotime('-13 days')), date('Y-m-d H:i:s', strtotime('-12 days'))]);
+    $grn2 = $ins("INSERT INTO grn (number, po_id, warehouse_id, received_date, delivery_note, received_by, created_at) VALUES (?, ?, ?, ?, 'DN-8812', ?, ?)",
+        ["GRN-$year-0001", $po2, $whId('LOD'), date('Y-m-d', strtotime('-7 days')), $uid['storekeeper'], date('Y-m-d H:i:s', strtotime('-7 days'))]);
+    $pol2 = [];
+    foreach ($pdo->query("SELECT l.*, i.description FROM pr_lines l JOIN items i ON i.id = l.item_id WHERE l.pr_id = $prB ORDER BY l.line_no")->fetchAll(PDO::FETCH_ASSOC) as $l) {
+        $plId = $ins('INSERT INTO po_lines (po_id, line_no, pr_line_id, item_id, description, specification, qty, unit, unit_price, fin1_id, fin2_id, fin3_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+             [$po2, $l['line_no'], $l['id'], $l['item_id'], $l['description'], $l['specification'], $l['qty'], $l['unit'], $l['unit_price'], $l['fin1_id'], $l['fin2_id'], $l['fin3_id']]);
+        $pol2[(int)$l['line_no']] = $plId;
+        $ins("INSERT INTO grn_lines (grn_id, po_line_id, item_id, line_type, qty_received, unit_price) VALUES (?, ?, ?, 'stock', ?, ?)", [$grn2, $plId, $l['item_id'], $l['qty'], $l['unit_price']]);
+        $wid = $whId('LOD'); $iidN = (int)$l['item_id']; $q = (float)$l['qty']; $cost = (float)$l['unit_price']; $when = date('Y-m-d H:i:s', strtotime('-7 days'));
+        $lot = $ins("INSERT INTO stock_lots (item_id, warehouse_id, source_type, source_ref, received_date, qty_in, qty_left, unit_cost, fin1_id, fin2_id, fin3_id, created_at)
+                     VALUES (?, ?, 'grn', ?, ?, ?, ?, ?, ?, ?, ?, ?)", [$iidN, $wid, "GRN-$year-0001", date('Y-m-d', strtotime('-7 days')), $q, $q, $cost, $l['fin1_id'], $l['fin2_id'], $l['fin3_id'], $when]);
+        $cur = $pdo->query("SELECT qty, avg_cost FROM stock WHERE item_id = $iidN AND warehouse_id = $wid")->fetch(PDO::FETCH_ASSOC);
+        $nq = ($cur ? (float)$cur['qty'] : 0) + $q; $nc = (($cur ? (float)$cur['qty'] * (float)$cur['avg_cost'] : 0) + $q * $cost) / $nq;
+        $pdo->prepare('INSERT INTO stock (item_id, warehouse_id, qty, avg_cost) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE qty = VALUES(qty), avg_cost = VALUES(avg_cost)')->execute([$iidN, $wid, $nq, $nc]);
+        $ins("INSERT INTO stock_moves (item_id, warehouse_id, move_type, qty, unit_cost, balance_after, ref_type, ref_id, ref_number, fin1_id, fin2_id, fin3_id, user_id, lot_id, created_at)
+              VALUES (?, ?, 'receipt', ?, ?, ?, 'grn', ?, ?, ?, ?, ?, ?, ?, ?)", [$iidN, $wid, $q, $cost, $nq, $grn2, "GRN-$year-0001", $l['fin1_id'], $l['fin2_id'], $l['fin3_id'], $uid['storekeeper'], $lot, $when]);
+    }
+    foreach ([['issued', 'Single quotation', '-13 days'], ['acknowledged by supplier', 'Mary Njeri, Accounts', '-12 days'], ['received', "GRN-$year-0001", '-7 days']] as [$a, $c, $t]) {
+        $ins('INSERT INTO po_history (po_id, user_id, action, comment, created_at) VALUES (?, ?, ?, ?, ?)', [$po2, $a === 'acknowledged by supplier' ? null : $uid[$a === 'received' ? 'storekeeper' : 'procurement'], $a, $c, date('Y-m-d H:i:s', strtotime($t))]);
+    }
+    $ins("INSERT INTO pr_history (pr_id, user_id, action, comment) VALUES (?, ?, 'ordered', ?)", [$prB, $uid['procurement'], "PO-$year-0002"]);
+    foreach ([[1, 'SI-24-4471', 2000, 0.40, 'ready', '', '-5 days'],
+              [2, 'SI-24-4472', 100, 6.90, 'on_hold', 'Line 2 (Blankets): price 6.90 is above the PO price 6.00 (+10% allowed).', '-4 days']] as $k => [$ln, $sno, $q, $pr, $st, $why, $t]) {
+        $invId = $ins("INSERT INTO invoices (number, supplier_invoice_no, po_id, supplier_id, currency, invoice_date, due_date, tax_amount, total, status, hold_reasons, created_by, created_at)
+                       VALUES (?, ?, ?, ?, 'USD', ?, ?, 0, ?, ?, ?, ?, ?)",
+            ["INV-$year-" . str_pad((string)($k + 1), 4, '0', STR_PAD_LEFT), $sno, $po2, $sup('SUP-0003'), date('Y-m-d', strtotime($t)), date('Y-m-d', strtotime($t . ' +30 days')), round($q * $pr, 2), $st, $why, $uid['finance'], date('Y-m-d H:i:s', strtotime($t))]);
+        $ins('INSERT INTO invoice_lines (invoice_id, po_line_id, qty, unit_price) VALUES (?, ?, ?, ?)', [$invId, $pol2[$ln], $q, $pr]);
+        $ins("INSERT INTO invoice_history (invoice_id, user_id, action, comment, created_at) VALUES (?, ?, 'recorded', ?, ?)", [$invId, $uid['finance'], "Supplier invoice $sno", date('Y-m-d H:i:s', strtotime($t))]);
+        if ($st === 'on_hold') $ins("INSERT INTO invoice_history (invoice_id, user_id, action, comment, created_at) VALUES (?, ?, 'put on hold', ?, ?)", [$invId, $uid['finance'], $why, date('Y-m-d H:i:s', strtotime($t))]);
+    }
 
     // Staff, locations and assets in use (with handovers)
     foreach ([['Grace Wanjiru', 'Programme Manager', 'Programmes', 'grace.w@horizon.example'], ['David Kiprono', 'Logistics Officer', 'Support', 'david.k@horizon.example'],

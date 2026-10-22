@@ -20,6 +20,11 @@ function render_header(string $title): void {
             $nav[] = ['Purchase Orders', 'po.php'];
             $nav[] = ['Suppliers', 'suppliers.php'];
         }
+        if (has_role('finance') || has_role('procurement') || has_role('admin')) {
+            $nav[] = ['Finance', null];
+            $nHold = (int)q("SELECT COUNT(*) FROM invoices WHERE status = 'on_hold'")->fetchColumn();
+            $nav[] = ['Supplier invoices' . ($nHold ? " ($nHold on hold)" : ''), 'invoices.php'];
+        }
         if (has_role('storekeeper') || has_role('procurement') || has_role('admin')) {
             $nav[] = ['Warehouse', null];
             if (has_role('storekeeper') || has_role('admin')) {

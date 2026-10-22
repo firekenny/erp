@@ -32,6 +32,11 @@ render_header('Dashboard'); ?>
   <?php if (has_role('admin')): $nCnt = (int)q("SELECT COUNT(*) FROM stock_counts WHERE status = 'submitted'")->fetchColumn(); if ($nCnt): ?>
   <a class="tile" href="counts.php" style="text-decoration:none;color:inherit"><span class="muted">Stock counts to approve</span><b><?= $nCnt ?></b></a>
   <?php endif; endif; ?>
+  <?php if (has_role('finance') || has_role('admin')): require_once __DIR__ . '/inc/invoice.php'; $nH = invoice_hold_count(); $nP = invoice_to_pay_count(); $nToInv = has_role('finance') ? count(pos_to_invoice()) : 0; ?>
+  <?php if (has_role('finance')): ?><a class="tile" href="invoices.php?new=1" style="text-decoration:none;color:inherit"><span class="muted">Received orders waiting for an invoice</span><b><?= $nToInv ?></b></a><?php endif; ?>
+  <?php if ($nH): ?><a class="tile" href="invoices.php?status=on_hold" style="text-decoration:none;color:inherit"><span class="muted">Invoices on hold (mismatch)</span><b><?= $nH ?></b></a><?php endif; ?>
+  <?php if (has_role('finance')): ?><a class="tile" href="invoices.php?status=open" style="text-decoration:none;color:inherit"><span class="muted">Invoices to pay</span><b><?= $nP ?></b></a><?php endif; ?>
+  <?php endif; ?>
   <?php if (has_role('requester')): ?>
   <a class="tile" href="requests.php?new=1" style="text-decoration:none;color:inherit;border-style:dashed"><span class="muted">Need items from the warehouse?</span><b style="font-size:17px">+ Stock request</b></a>
   <a class="tile" href="pr_edit.php" style="text-decoration:none;color:inherit;border-style:dashed"><span class="muted">Start a</span><b style="font-size:17px">+ New Purchase Request</b></a>

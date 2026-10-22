@@ -5,7 +5,7 @@ $u = require_login();
 
 $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
 $po = po_get($id);
-$canSee = $po && (has_role('procurement') || has_role('admin') || has_role('storekeeper') || (int)q('SELECT requester_id FROM pr WHERE id = ?', [$po['pr_id']])->fetchColumn() === (int)$u['id']);
+$canSee = $po && (has_role('procurement') || has_role('admin') || has_role('storekeeper') || has_role('finance') || (int)q('SELECT requester_id FROM pr WHERE id = ?', [$po['pr_id']])->fetchColumn() === (int)$u['id']);
 if (!$canSee) { flash('Purchase Order not found or not accessible.', 'err'); redirect('index.php'); }
 $isProc = has_role('procurement') || has_role('admin');
 require_once __DIR__ . '/inc/stock.php';
@@ -57,6 +57,13 @@ if ($grns || ((has_role('storekeeper') || has_role('admin')) && in_array($po['st
 <div class="flash noprint" style="background:#e8f0f8;color:#1f4e79">Receipts: <?php foreach ($grns as $g): ?><a href="grn_view.php?id=<?= (int)$g['id'] ?>"><b><?= e($g['number']) ?></b></a> (<?= e(date('d M', strtotime($g['received_date']))) ?>) <?php endforeach; ?><?= $grns ? '' : 'none yet' ?>
   <?php if ((has_role('storekeeper') || has_role('admin')) && in_array($po['status'], ['issued', 'acknowledged', 'partially_received'], true)): ?> · <a class="btn small" href="receive.php?po=<?= $id ?>">Receive goods</a><?php endif; ?></div>
 <?php endif; ?>
+<?php if (has_role('finance') || $isProc):
+  $invs = q("SELECT i.id, i.number, i.supplier_invoice_no, i.total, i.status, (SELECT COALESCE(SUM(amount), 0) FROM payments y WHERE y.invoice_id = i.id) AS paid FROM invoices i WHERE i.po_id = ? ORDER BY i.id", [$id])->fetchAll();
+  $canInv = (has_role('finance') || has_role('admin')) && in_array($po['status'], ['partially_received', 'received'], true);
+  if ($invs || $canInv): require_once __DIR__ . '/inc/invoice.php'; ?>
+<div class="flash noprint" style="background:#e8f0f8;color:#1f4e79">Invoices: <?php foreach ($invs as $i): ?><a href="invoice_view.php?id=<?= (int)$i['id'] ?>"><b><?= e($i['number']) ?></b></a> <?= number_format((float)$i['total'], 2) ?> <?= inv_badge($i['status']) ?> <?php endforeach; ?><?= $invs ? '' : 'none yet' ?>
+  <?php if ($canInv): ?> · <a class="btn small" href="invoices.php?po=<?= $id ?>">Record an invoice</a><?php endif; ?></div>
+<?php endif; endif; ?>
 <?php require __DIR__ . '/inc/po_document.php'; ?>
 
 <?php if ($isProc): ?>

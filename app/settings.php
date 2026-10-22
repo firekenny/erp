@@ -42,7 +42,7 @@ render_header('Organisation'); ?>
   <h2 style="margin-top:20px">Purchase Orders and awards</h2>
   <div class="row">
     <div><label>PO number prefix</label><input type="text" name="po_prefix" maxlength="10" value="<?= e(setting('po_prefix', 'PO')) ?>"></div>
-    <div><label>Award tolerance above the PR estimate (%)</label><input type="number" name="award_tolerance_pct" min="0" max="100" step="0.5" value="<?= e(setting('award_tolerance_pct', '10')) ?>">
+    <div><label>Tolerance (%): award above the PR estimate, and invoice price above the PO price</label><input type="number" name="award_tolerance_pct" min="0" max="100" step="0.5" value="<?= e(setting('award_tolerance_pct', '10')) ?>">
       <span class="muted">Above this, the award is flagged to approvers and needs a justification.</span></div>
   </div>
   <div class="row"><div style="max-width:320px"><label>Asset ID prefix</label><input type="text" name="asset_prefix" maxlength="6" value="<?= e(setting('asset_prefix', 'AS')) ?>">

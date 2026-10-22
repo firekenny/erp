@@ -6,7 +6,7 @@ declare(strict_types=1);
  * After each deploy, the app upgrades the database by itself on the next page load —
  * no manual SQL needed.
  */
-const SCHEMA_VERSION = 12;
+const SCHEMA_VERSION = 13;
 
 function schema_migrations(): array {
     return [
@@ -681,6 +681,64 @@ function schema_migrations(): array {
                 ip VARCHAR(45) NOT NULL,
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 KEY ix_email (email, created_at), KEY ix_ip (ip, created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        ],
+        13 => [
+            "CREATE TABLE IF NOT EXISTS invoices (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                number VARCHAR(40) NOT NULL UNIQUE,
+                supplier_invoice_no VARCHAR(80) NOT NULL,
+                po_id INT NOT NULL,
+                supplier_id INT NOT NULL,
+                currency CHAR(3) NOT NULL,
+                invoice_date DATE NOT NULL,
+                due_date DATE NULL,
+                tax_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+                total DECIMAL(14,2) NOT NULL DEFAULT 0,
+                notes TEXT,
+                file_name VARCHAR(120) NOT NULL DEFAULT '',
+                file_orig VARCHAR(190) NOT NULL DEFAULT '',
+                status ENUM('on_hold','ready','part_paid','paid','cancelled') NOT NULL DEFAULT 'on_hold',
+                hold_reasons TEXT,
+                override_by INT NULL,
+                override_at DATETIME NULL,
+                override_reason VARCHAR(500) NULL,
+                created_by INT NOT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY ix_po (po_id), KEY ix_sup (supplier_id, supplier_invoice_no),
+                CONSTRAINT fk_inv_po FOREIGN KEY (po_id) REFERENCES po(id),
+                CONSTRAINT fk_inv_sup FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS invoice_lines (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                invoice_id INT NOT NULL,
+                po_line_id INT NOT NULL,
+                qty DECIMAL(14,3) NOT NULL,
+                unit_price DECIMAL(14,2) NOT NULL,
+                KEY ix_inv (invoice_id), KEY ix_pol (po_line_id),
+                CONSTRAINT fk_invl_inv FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS payments (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                invoice_id INT NOT NULL,
+                paid_date DATE NOT NULL,
+                amount DECIMAL(14,2) NOT NULL,
+                method VARCHAR(40) NOT NULL DEFAULT '',
+                reference VARCHAR(120) NOT NULL DEFAULT '',
+                user_id INT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY ix_inv (invoice_id),
+                CONSTRAINT fk_pay_inv FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS invoice_history (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                invoice_id INT NOT NULL,
+                user_id INT NULL,
+                action VARCHAR(60) NOT NULL,
+                comment TEXT,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY ix_inv (invoice_id),
+                CONSTRAINT fk_invh_inv FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         ],
     ];
