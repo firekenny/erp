@@ -1,4 +1,11 @@
 Options -Indexes
+
+# Always use the secure (HTTPS) address
+RewriteEngine On
+RewriteCond %{HTTPS} !=on
+RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
 <Files "config.php">
   Require all denied
 </Files>
