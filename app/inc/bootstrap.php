@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 define('APP_ROOT', dirname(__DIR__));
-define('APP_VERSION', '0.1 (Phase 1 – setup)');
+define('APP_VERSION', '0.2 (Phase 1 – setup + Purchase Requests)');
 
 session_set_cookie_params(['httponly' => true, 'samesite' => 'Lax', 'secure' => !empty($_SERVER['HTTPS'])]);
 session_name('erp_session');
@@ -17,6 +17,7 @@ require __DIR__ . '/functions.php';
 require __DIR__ . '/layout.php';
 require __DIR__ . '/schema.php';
 require __DIR__ . '/demo.php';
+require_once __DIR__ . '/pr.php';
 
 // Upgrade the database automatically after a new version is deployed
 if ((int)(q("SELECT v FROM settings WHERE k = 'db_version'")->fetchColumn() ?: 0) < SCHEMA_VERSION) {

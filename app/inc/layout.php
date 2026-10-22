@@ -9,7 +9,9 @@ function render_header(string $title): void {
     if ($u) {
         $nav[] = ['Main', null];
         $nav[] = ['Dashboard', 'index.php'];
-        $nav[] = ['Purchase Requests', 'pr.php'];
+        $prLabel = 'Purchase Requests';
+        if (function_exists('pr_counts')) { $c = pr_counts($u); $n = $c['to_approve'] + $c['self_blocked'] + $c['returned']; if ($n) $prLabel .= " ($n)"; }
+        $nav[] = [$prLabel, 'pr.php'];
         if (has_role('admin')) {
             $nav[] = ['Setup', null];
             $nav[] = ['Organisation', 'settings.php'];
@@ -25,7 +27,7 @@ function render_header(string $title): void {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= e($title) ?> · <?= e($org) ?></title>
-<link rel="stylesheet" href="assets/style.css?v=2">
+<link rel="stylesheet" href="assets/style.css?v=3">
 </head>
 <body>
 <?php if (function_exists('is_demo') && is_demo()): ?>
@@ -39,9 +41,9 @@ function render_header(string $title): void {
 </header>
 <div class="shell">
 <nav class="side">
-<?php foreach ($nav as [$label, $href]): ?>
+<?php foreach ($nav as [$label, $href]): $isOn = $page === $href || ($href === 'pr.php' && str_starts_with($page, 'pr_')); ?>
   <?php if ($href === null): ?><div class="nav-h"><?= e($label) ?></div>
-  <?php else: ?><a href="<?= e($href) ?>" class="<?= $page === $href ? 'on' : '' ?>"><?= e($label) ?></a><?php endif; ?>
+  <?php else: ?><a href="<?= e($href) ?>" class="<?= $isOn ? 'on' : '' ?>"><?= e($label) ?></a><?php endif; ?>
 <?php endforeach; ?>
 </nav>
 <main>

@@ -6,7 +6,7 @@ declare(strict_types=1);
  * After each deploy, the app upgrades the database by itself on the next page load —
  * no manual SQL needed.
  */
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 function schema_migrations(): array {
     return [
@@ -83,6 +83,64 @@ function schema_migrations(): array {
         2 => [
             // Each level is either filtered by the level above (linked = 1) or one independent list (linked = 0)
             "ALTER TABLE fin_levels ADD COLUMN linked TINYINT(1) NOT NULL DEFAULT 1",
+        ],
+        3 => [
+            // Purchase Requests
+            "CREATE TABLE IF NOT EXISTS pr (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                number VARCHAR(40) NOT NULL UNIQUE,
+                requester_id INT NOT NULL,
+                title VARCHAR(200) NOT NULL,
+                needed_by DATE NULL,
+                delivery_location VARCHAR(200) NOT NULL DEFAULT '',
+                justification TEXT,
+                currency CHAR(3) NOT NULL,
+                status ENUM('draft','submitted','returned','approved','cancelled') NOT NULL DEFAULT 'draft',
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                submitted_at DATETIME NULL,
+                approved_at DATETIME NULL,
+                KEY ix_status (status),
+                CONSTRAINT fk_pr_req FOREIGN KEY (requester_id) REFERENCES users(id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+            "CREATE TABLE IF NOT EXISTS pr_lines (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                pr_id INT NOT NULL,
+                line_no SMALLINT NOT NULL,
+                item_id INT NOT NULL,
+                specification VARCHAR(500) NOT NULL DEFAULT '',
+                qty DECIMAL(14,3) NOT NULL,
+                unit VARCHAR(30) NOT NULL,
+                unit_price DECIMAL(14,2) NOT NULL DEFAULT 0,
+                fin1_id INT NULL, fin2_id INT NULL, fin3_id INT NULL, fin4_id INT NULL,
+                KEY ix_pr (pr_id),
+                CONSTRAINT fk_prl_pr FOREIGN KEY (pr_id) REFERENCES pr(id) ON DELETE CASCADE,
+                CONSTRAINT fk_prl_item FOREIGN KEY (item_id) REFERENCES items(id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+            "CREATE TABLE IF NOT EXISTS pr_approvals (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                pr_id INT NOT NULL,
+                approver_id INT NOT NULL,
+                fin_value_id INT NULL,
+                status ENUM('pending','approved','returned') NOT NULL DEFAULT 'pending',
+                comment TEXT,
+                decided_by INT NULL,
+                decided_at DATETIME NULL,
+                KEY ix_pr (pr_id), KEY ix_appr (approver_id, status),
+                CONSTRAINT fk_pra_pr FOREIGN KEY (pr_id) REFERENCES pr(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+            "CREATE TABLE IF NOT EXISTS pr_history (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                pr_id INT NOT NULL,
+                user_id INT NULL,
+                action VARCHAR(40) NOT NULL,
+                comment TEXT,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY ix_pr (pr_id),
+                CONSTRAINT fk_prh_pr FOREIGN KEY (pr_id) REFERENCES pr(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         ],
     ];
 }

@@ -59,3 +59,13 @@ details summary{cursor:pointer;font-weight:600}
 }
 .demo-bar{background:#ffb703;color:#3d2c00;text-align:center;font-size:13px;font-weight:600;padding:5px 10px}
 .demo-bar a{color:#3d2c00}
+.tag.warn{background:var(--warn);color:var(--warn-ink)}
+.print-only{display:none}
+@media print{
+  .topbar,.side,.demo-bar,.noprint,.menu-btn{display:none!important}
+  .print-only{display:block}
+  body{background:#fff;font-size:12px}
+  main{padding:0;max-width:none}
+  .card,.table-wrap{border:1px solid #ccc;break-inside:avoid}
+  th,td{padding:4px 6px}
+}

@@ -117,4 +117,47 @@ function demo_seed(PDO $pdo): void {
                  [$cc . '-' . str_pad((string)($n + 1), 4, '0', STR_PAD_LEFT), $it[0], $cid, $it[1], $it[2] ?? $type]);
         }
     }
+
+    // Sample Purchase Requests, one per status
+    $fid  = fn(string $code) => (int)$pdo->query('SELECT id FROM fin_values WHERE code = ' . $pdo->quote($code))->fetchColumn();
+    $iid  = fn(string $code) => $pdo->query('SELECT id, unit FROM items WHERE code = ' . $pdo->quote($code))->fetch(PDO::FETCH_ASSOC);
+    $year = date('Y'); $n = 0;
+    $mk = function (string $req, string $title, string $status, string $donor, string $cc, array $lines, array $flow, string $loc, int $daysAgo)
+          use ($pdo, $ins, $fid, $iid, $uid, $year, &$n) {
+        $n++;
+        $created = date('Y-m-d H:i:s', strtotime("-$daysAgo days 09:00"));
+        $prId = $ins('INSERT INTO pr (number, requester_id, title, needed_by, delivery_location, justification, currency, status, created_at, submitted_at, approved_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            ["PR-$year-" . str_pad((string)$n, 4, '0', STR_PAD_LEFT), $uid[$req], $title, date('Y-m-d', strtotime('+' . (21 - $daysAgo) . ' days')), $loc,
+             'Sample request created for the demo.', 'USD', $status, $created,
+             $status === 'draft' ? null : $created, $status === 'approved' ? date('Y-m-d H:i:s', strtotime("-$daysAgo days 15:00")) : null]);
+        foreach ($lines as $i => [$item, $spec, $qty, $price, $bl]) {
+            $it = $iid($item);
+            $ins('INSERT INTO pr_lines (pr_id, line_no, item_id, specification, qty, unit, unit_price, fin1_id, fin2_id, fin3_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                 [$prId, $i + 1, $it['id'], $spec, $qty, $it['unit'], $price, $fid($donor), $fid($cc), $fid($bl)]);
+        }
+        $hist = fn($who, $act, $c = '') => $ins('INSERT INTO pr_history (pr_id, user_id, action, comment, created_at) VALUES (?, ?, ?, ?, ?)', [$prId, $uid[$who], $act, $c, $created]);
+        $hist($req, 'created');
+        if ($status === 'draft') return;
+        $hist($req, 'submitted');
+        [$approver, $state, $comment, $by] = $flow;
+        $ins('INSERT INTO pr_approvals (pr_id, approver_id, fin_value_id, status, comment, decided_by, decided_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+             [$prId, $uid[$approver], $fid($cc), $state, $comment, $state === 'pending' ? null : $uid[$by], $state === 'pending' ? null : $created]);
+        if ($state === 'approved') { $hist($by, 'approved', $comment); $hist($by, 'fully approved'); }
+        if ($state === 'returned') $hist($by, 'returned', $comment);
+    };
+    $mk('requester', 'Hygiene kits for Turkana distribution', 'submitted', 'ECHO', 'ECH-TUR',
+        [['CLN-0003', 'Family kit: soap, sanitary pads, jerrycan, toothbrushes', 500, 18.50, '5030'], ['CAMP-0004', 'WHO-approved, 180 x 160 x 150 cm', 500, 4.20, '5030']],
+        ['budget_holder', 'pending', '', null], 'Lodwar warehouse', 1);
+    $mk('requester', 'Laptops for the M&E team', 'approved', 'FCDO', 'FCD-NBI',
+        [['IT-0001', 'Including carry bag and 3-year warranty', 4, 950, '7020'], ['ITC-0003', '', 4, 12, '7020']],
+        ['budget_holder', 'approved', 'OK, within budget.', 'budget_holder'], 'Nairobi office', 6);
+    $mk('budget_holder', 'Backup generator for Marsabit field office', 'submitted', 'ECHO', 'ECH-TUR',
+        [['GEN-0001', 'Silent canopy, with installation', 1, 6800, '7030']],
+        ['budget_holder', 'pending', '', null], 'Marsabit field office', 2);
+    $mk('requester', 'Replacement tyres for KDA 123X', 'returned', 'UNR', 'UNR-SUP',
+        [['SPR-0003', 'All-terrain', 4, 210, '6020']],
+        ['budget_holder', 'returned', 'Please attach the fleet officer\'s inspection note and check whether 2 tyres are enough.', 'budget_holder'], 'Nairobi garage', 4);
+    $mk('requester', 'Office stationery for Q4', 'draft', 'UNR', 'UNR-SUP',
+        [['STAT-0001', '', 40, 4.80, '7010'], ['STAT-0002', '', 6, 7.50, '7010']],
+        [], 'Nairobi office', 0);
 }
