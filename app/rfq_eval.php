@@ -78,6 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         q("UPDATE rfq SET award_status = 'submitted', award_total = ?, award_submitted_by = ?, award_submitted_at = NOW() WHERE id = ?", [$total, $u['id'], $id]);
         rfq_log($id, 'award submitted for approval', number_format($total, 2) . ' ' . $rfq['currency'] . ($over > $tol ? ' · ' . number_format($over, 1) . '% over estimate' : ''));
         db()->commit();
+        notify_award_approvers($id);
         $names = q('SELECT DISTINCT u.name FROM award_approvals a JOIN users u ON u.id = a.approver_id WHERE a.rfq_id = ? ORDER BY a.stage', [$id])->fetchAll(PDO::FETCH_COLUMN);
         flash('Award submitted for approval: ' . implode(' → ', $names) . '.'); $back();
     }
@@ -95,11 +96,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             q("UPDATE rfq SET award_status = 'returned' WHERE id = ?", [$id]);
             rfq_log($id, 'award returned', $comment . $note);
             db()->commit();
+            notify_users([$rfq['award_submitted_by']], 'Award returned: ' . $rfq['number'], 'The award for <b>' . e($rfq['number']) . '</b> (' . e($rfq['title']) . ') was returned by ' . e($u['name']) . ': <i>' . e($comment) . '</i>', 'rfq_eval.php?id=' . $id);
             flash('Award returned to Procurement.'); $back();
         }
         rfq_log($id, 'award approved', trim($comment . $note));
         $left = (int)q("SELECT COUNT(*) FROM award_approvals WHERE rfq_id = ? AND status = 'pending'", [$id])->fetchColumn();
-        if ($left) { db()->commit(); flash('Your approval is recorded. Waiting for the next approver.'); $back(); }
+        if ($left) { db()->commit(); notify_award_approvers($id); flash('Your approval is recorded. Waiting for the next approver.'); $back(); }
         // Final approval: issue the Purchase Orders
         q("UPDATE rfq SET award_status = 'approved', award_approved_at = NOW(), status = 'awarded' WHERE id = ?", [$id]);
         $poIds = generate_pos(rfq_get($id));
@@ -110,6 +112,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         db()->commit();
         $sent = 0;
         foreach ($poIds as $pid) { $st = po_send(po_get($pid)); if (str_starts_with($st, 'Email sent')) $sent++; po_log($pid, 'sent to supplier', $st); }
+        $reqId = (int)q('SELECT requester_id FROM pr WHERE id = ?', [$rfq['pr_id']])->fetchColumn();
+        notify_users([$rfq['award_submitted_by']], 'Award approved: ' . $rfq['number'], 'The award for <b>' . e($rfq['number']) . '</b> is approved. Purchase Order(s) issued: ' . e(implode(', ', $nums)) . '.', 'rfq_eval.php?id=' . $id);
+        notify_users([$reqId], 'Ordered: ' . $rfq['pr_number'], 'Your request <b>' . e($rfq['pr_number']) . '</b> (' . e($rfq['title']) . ') has been ordered: ' . e(implode(', ', $nums)) . '.', 'pr_view.php?id=' . $rfq['pr_id']);
         flash('Award approved. ' . count($poIds) . ' Purchase Order(s) issued: ' . implode(', ', $nums) . '. ' . ($sent === count($poIds) ? 'Emailed to the suppliers.' : 'Send the supplier links from each PO page.'));
         $back();
     }

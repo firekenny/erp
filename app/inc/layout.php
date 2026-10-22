@@ -53,6 +53,7 @@ function render_header(string $title): void {
             $nav[] = ['Approval thresholds', 'approvals.php'];
             $nav[] = ['Procurement methods', 'methods.php'];
             $nav[] = ['Email settings', 'email_settings.php'];
+            $nav[] = ['Audit log', 'audit.php'];
             $nav[] = ['Item categories', 'categories.php'];
             $nav[] = ['Item catalogue', 'items.php'];
             $nav[] = ['Warehouses', 'warehouses.php'];
@@ -74,7 +75,7 @@ function render_header(string $title): void {
 <header class="topbar">
   <button class="menu-btn" onclick="document.body.classList.toggle('nav-open')" aria-label="Menu">☰</button>
   <span class="brand"><?= e($org) ?> <small>ERP</small></span>
-  <span class="who"><?= e($u['name']) ?> · <a href="logout.php">Sign out</a></span>
+  <span class="who"><a href="account.php" style="text-decoration:none"><?= e($u['name']) ?></a> · <a href="logout.php">Sign out</a></span>
 </header>
 <div class="shell">
 <nav class="side">

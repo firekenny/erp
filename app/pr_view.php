@@ -29,6 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             q("UPDATE pr SET status = 'returned' WHERE id = ?", [$id]);
             pr_log($id, 'returned', $comment . $onBehalf);
             flash('Request returned to ' . $pr['requester_name'] . '.');
+            $notify = fn() => notify_users([$pr['requester_id']], 'Returned for changes: ' . $pr['number'], 'Your Purchase Request <b>' . e($pr['number']) . '</b> (' . e($pr['title']) . ') was returned by ' . e($u['name']) . ': <i>' . e($comment) . '</i>', 'pr_edit.php?id=' . $id);
         } else {
             pr_log($id, 'approved', trim($comment . $onBehalf));
             $left = (int)q("SELECT COUNT(*) FROM pr_approvals WHERE pr_id = ? AND status = 'pending'", [$id])->fetchColumn();
@@ -36,12 +37,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 q("UPDATE pr SET status = 'approved', approved_at = NOW() WHERE id = ?", [$id]);
                 pr_log($id, 'fully approved');
                 flash('Approved. The request now goes to Procurement.');
+                $notify = function () use ($pr, $id) {
+                    notify_users([$pr['requester_id']], 'Approved: ' . $pr['number'], 'Your Purchase Request <b>' . e($pr['number']) . '</b> (' . e($pr['title']) . ') is fully approved and now goes to Procurement.', 'pr_view.php?id=' . $id);
+                    notify_users(users_with_role('procurement'), 'New approved request: ' . $pr['number'], 'Purchase Request <b>' . e($pr['number']) . '</b> (' . e($pr['title']) . ') is approved and waiting for an RFQ.', 'pr_view.php?id=' . $id);
+                };
             } else {
                 $next = q("SELECT DISTINCT u.name, a.level_name FROM pr_approvals a JOIN users u ON u.id = a.approver_id WHERE a.pr_id = ? AND a.status = 'pending' AND " . PR_CURRENT_STAGE, [$id])->fetchAll();
+                $notify = fn() => notify_pr_approvers($id);
                 flash('Your approval is recorded. Now waiting for ' . implode(', ', array_map(fn($x) => $x['name'] . ($x['level_name'] && $x['level_name'] !== 'Budget Holder' ? ' (' . $x['level_name'] . ')' : ''), $next)) . '.');
             }
         }
         db()->commit();
+        if (isset($notify)) $notify();
         redirect("pr_view.php?id=$id");
     }
     if ($act === 'cancel' && pr_can_cancel($pr, $u)) {

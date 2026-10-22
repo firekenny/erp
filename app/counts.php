@@ -35,6 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($missing) { flash("$missing item(s) have no counted quantity yet (enter 0 if none were found).", 'err'); redirect("counts.php?id=$id"); }
             q('UPDATE stock_count_lines l LEFT JOIN stock s ON s.item_id = l.item_id AND s.warehouse_id = ? SET l.system_qty = COALESCE(s.qty, 0) WHERE l.count_id = ?', [$c['warehouse_id'], $id]);
             q("UPDATE stock_counts SET status = 'submitted', submitted_by = ?, submitted_at = NOW() WHERE id = ?", [$u['id'], $id]);
+            notify_users(users_with_role('admin'), 'Stock count to approve: ' . $c['number'], 'Stock count <b>' . e($c['number']) . '</b> was submitted by ' . e($u['name']) . '. Please review the differences.', 'counts.php?id=' . $id);
             flash('Count submitted. An Administrator will review the differences.');
         } else flash('Saved.');
         redirect("counts.php?id=$id");

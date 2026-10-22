@@ -14,6 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         set_setting('currency', $cur);
         set_setting('pr_prefix', $pfx ?: 'PR');
         set_setting('org_address', trim((string)($_POST['org_address'] ?? '')));
+        set_setting('session_timeout_min', (string)max(5, min(720, (int)($_POST['session_timeout_min'] ?? 60))));
         set_setting('po_prefix', strtoupper(preg_replace('/[^A-Za-z0-9-]/', '', (string)($_POST['po_prefix'] ?? 'PO'))) ?: 'PO');
         set_setting('po_payment_terms', trim((string)($_POST['po_payment_terms'] ?? '')));
         set_setting('po_terms', trim((string)($_POST['po_terms'] ?? '')));
@@ -35,6 +36,7 @@ render_header('Organisation'); ?>
     <div><label>Purchase Request number prefix</label><input type="text" name="pr_prefix" maxlength="10" value="<?= e(setting('pr_prefix', 'PR')) ?>">
       <span class="muted">Numbers will look like <?= e(setting('pr_prefix', 'PR')) ?>-<?= date('Y') ?>-0001</span></div>
   </div>
+  <div class="row"><div style="max-width:320px"><label>Sign out after inactivity (minutes)</label><input type="number" name="session_timeout_min" min="5" max="720" value="<?= e(setting('session_timeout_min', '60')) ?>"></div></div>
   <label>Organisation address (printed on Purchase Orders)</label>
   <textarea name="org_address" rows="2"><?= e(setting('org_address')) ?></textarea>
   <h2 style="margin-top:20px">Purchase Orders and awards</h2>

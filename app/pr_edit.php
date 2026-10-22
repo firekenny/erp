@@ -86,6 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $higher = q('SELECT a.level_name, u.name FROM pr_approvals a JOIN users u ON u.id = a.approver_id WHERE a.pr_id = ? AND a.stage > 1 ORDER BY a.stage', [$id])->fetchAll();
     flash('Submitted for approval to ' . implode(', ', $names) . '.'
         . ($higher ? ' Because of the amount, it then goes to ' . implode(', then ', array_map(fn($h) => $h['name'] . ' (' . $h['level_name'] . ')', $higher)) . '.' : '') . ($selfApproval ? ' You are the Budget Holder for part of it, so an Administrator will approve that part.' : ''));
+    notify_pr_approvers($id);
     redirect("pr_view.php?id=$id");
 }
 

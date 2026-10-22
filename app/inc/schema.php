@@ -6,7 +6,7 @@ declare(strict_types=1);
  * After each deploy, the app upgrades the database by itself on the next page load —
  * no manual SQL needed.
  */
-const SCHEMA_VERSION = 11;
+const SCHEMA_VERSION = 12;
 
 function schema_migrations(): array {
     return [
@@ -671,6 +671,16 @@ function schema_migrations(): array {
                 counted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 KEY ix_c (count_id), KEY ix_a (asset_id),
                 CONSTRAINT fk_acl_c FOREIGN KEY (count_id) REFERENCES asset_counts(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        ],
+        12 => [
+            "ALTER TABLE users ADD COLUMN notify_email TINYINT(1) NOT NULL DEFAULT 1",
+            "CREATE TABLE IF NOT EXISTS login_attempts (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                email VARCHAR(190) NOT NULL,
+                ip VARCHAR(45) NOT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY ix_email (email, created_at), KEY ix_ip (ip, created_at)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         ],
     ];

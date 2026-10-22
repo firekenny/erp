@@ -26,6 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && has_role('requester')) {
         foreach ($lines as $itemId => $qty) q('INSERT INTO stock_request_lines (request_id, item_id, qty_requested) VALUES (?, ?, ?)', [$rid, $itemId, $qty]);
         db()->commit();
         audit('stock_request.create', $num);
+        notify_users(users_with_role('storekeeper'), 'Stock request ' . $num, e($u['name']) . ' asks for items from the warehouse (' . count($lines) . ' item(s)' . (trim((string)($_POST['destination'] ?? '')) !== '' ? ', for ' . e(trim((string)$_POST['destination'])) : '') . ').', 'request_view.php?id=' . $rid);
         flash("Stock request $num sent to the storekeeper.");
         redirect("request_view.php?id=$rid");
     }

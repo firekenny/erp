@@ -18,6 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $open) {
         $note = trim((string)($_POST['note'] ?? ''));
         if ($note === '') { flash('Give the reason.', 'err'); redirect("request_view.php?id=$id"); }
         q("UPDATE stock_requests SET status = ?, storekeeper_note = ? WHERE id = ?", [$r['status'] === 'partially_issued' ? 'issued' : 'rejected', mb_substr($note, 0, 500), $id]);
+        notify_users([$r['requester_id']], ($r['status'] === 'partially_issued' ? 'Request closed: ' : 'Request rejected: ') . $r['number'], 'Your stock request <b>' . e($r['number']) . '</b> was ' . ($r['status'] === 'partially_issued' ? 'closed' : 'rejected') . ' by the storekeeper: <i>' . e($note) . '</i>', 'request_view.php?id=' . $id);
         flash($r['status'] === 'partially_issued' ? 'Request closed with what was already issued.' : 'Request rejected.'); redirect("request_view.php?id=$id");
     }
     if ($act === 'issue' && $isStore) {
@@ -51,6 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $open) {
         q('UPDATE stock_requests SET status = ? WHERE id = ?', [$left > 0.0001 ? 'partially_issued' : 'issued', $id]);
         audit('issue.create', $num);
         db()->commit();
+        notify_users([$r['requester_id']], 'Items issued: ' . $r['number'], 'Your stock request <b>' . e($r['number']) . '</b> has been ' . ($left > 0.0001 ? 'partly ' : '') . 'issued (' . e($num) . '). Please collect the items and sign the voucher.', 'request_view.php?id=' . $id);
         flash("$num issued. Print the voucher and have the recipient sign it.");
         redirect("issue_view.php?id=$iid");
     }
