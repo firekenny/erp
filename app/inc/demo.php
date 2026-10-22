@@ -369,4 +369,11 @@ function demo_seed(PDO $pdo): void {
         $ins('INSERT INTO stock_request_lines (request_id, item_id, qty_requested) VALUES (?, (SELECT id FROM items WHERE code = ?), ?)', [$srId, $ic, $q]);
     }
     $ins("INSERT INTO pr_history (pr_id, user_id, action, comment) VALUES (?, ?, 'ordered', ?)", [$prR, $uid['procurement'], "PO-$year-0001"]);
+
+    // Budgets per cost centre × budget line (the Turkana hygiene request is over what is left)
+    $pdo->prepare("INSERT INTO settings (k, v) VALUES ('budget_level_a', ?), ('budget_level_b', ?) ON DUPLICATE KEY UPDATE v = VALUES(v)")->execute([(string)$lv2, (string)$lv3]);
+    foreach ([['ECH-TUR', '5030', 12000], ['ECH-TUR', '7020', 4000], ['ECH-TUR', '6030', 60000], ['ECH-MAR', '5030', 8000], ['ECH-MAR', '7030', 7000],
+              ['FCD-NBI', '7020', 6000], ['FCD-GAR', '5010', 3000], ['FCD-GAR', '5020', 6000], ['UNR-SUP', '7010', 1500], ['UNR-SUP', '7020', 2000]] as [$a, $b, $amt]) {
+        $ins('INSERT INTO budgets (a_value_id, b_value_id, amount, updated_by) VALUES (?, ?, ?, ?)', [$finId($a), $finId($b), $amt, $uid['admin']]);
+    }
 }

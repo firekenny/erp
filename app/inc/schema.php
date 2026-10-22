@@ -6,7 +6,7 @@ declare(strict_types=1);
  * After each deploy, the app upgrades the database by itself on the next page load —
  * no manual SQL needed.
  */
-const SCHEMA_VERSION = 13;
+const SCHEMA_VERSION = 14;
 
 function schema_migrations(): array {
     return [
@@ -739,6 +739,18 @@ function schema_migrations(): array {
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 KEY ix_inv (invoice_id),
                 CONSTRAINT fk_invh_inv FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        ],
+        14 => [
+            "CREATE TABLE IF NOT EXISTS budgets (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                a_value_id INT NOT NULL,
+                b_value_id INT NOT NULL DEFAULT 0,
+                amount DECIMAL(14,2) NOT NULL,
+                notes VARCHAR(255) NOT NULL DEFAULT '',
+                updated_by INT NULL,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_ab (a_value_id, b_value_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         ],
     ];

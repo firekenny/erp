@@ -35,8 +35,11 @@ function notify_pr_approvers(int $prId): void {
         if ((int)$aid === (int)$pr['requester_id']) $ids = array_merge($ids, array_diff(users_with_role('admin'), [$pr['requester_id']]));
         else $ids[] = $aid;
     }
-    notify_users($ids, 'To approve: ' . $pr['number'] . ' · ' . $pr['title'],
-        'Purchase Request <b>' . e($pr['number']) . '</b> from ' . e($pr['requester_name']) . ' (' . e($pr['title']) . ') is waiting for your approval.', 'pr_view.php?id=' . $prId);
+    require_once __DIR__ . '/budget.php';
+    $over = budget_is_over(budget_check_lines(pr_lines($prId)));
+    notify_users($ids, 'To approve: ' . $pr['number'] . ' · ' . $pr['title'] . ($over ? ' (OVER BUDGET)' : ''),
+        'Purchase Request <b>' . e($pr['number']) . '</b> from ' . e($pr['requester_name']) . ' (' . e($pr['title']) . ') is waiting for your approval.'
+        . ($over ? '<br><b style="color:#b3261e">It is over the budget left.</b> Open it to see the budget check.' : ''), 'pr_view.php?id=' . $prId);
 }
 
 /** People who must act now on an award */

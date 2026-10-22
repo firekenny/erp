@@ -1,6 +1,7 @@
 <?php
 require __DIR__ . '/inc/bootstrap.php';
 require_once __DIR__ . '/inc/pr.php';
+require_once __DIR__ . '/inc/budget.php';
 $u = require_login();
 
 $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
@@ -16,6 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $rows = pr_decidable($pr, $u);
         if (!$rows) { flash('There is nothing for you to approve on this request.', 'err'); redirect("pr_view.php?id=$id"); }
         if ($act === 'return' && $comment === '') { flash('Say what needs to change when returning a request.', 'err'); redirect("pr_view.php?id=$id"); }
+        if ($act === 'approve' && $comment === '' && budget_is_over(budget_check_lines(pr_lines($id)))) { flash('This request is over budget: write a comment explaining why you approve it anyway.', 'err'); redirect("pr_view.php?id=$id"); }
         // a Budget Holder decides on their own rows; an admin on all decidable rows
         $mine = array_filter($rows, fn($a) => (int)$a['approver_id'] === (int)$u['id']);
         $targets = $mine ?: $rows;
@@ -93,6 +95,8 @@ render_header($pr['number']); ?>
   <a href="pr.php" style="margin-left:auto">Back to list</a>
 </div>
 
+<?php $budgetCheck = in_array($pr['status'], ['draft', 'submitted', 'returned', 'approved', 'processing'], true) ? budget_check_lines($lines) : [];
+echo budget_panel($budgetCheck, $pr['currency']); ?>
 <?php if ($decidable): ?>
 <div class="card noprint" style="border-color:var(--brand)">
   <h2>Your decision</h2>
@@ -105,7 +109,7 @@ render_header($pr['number']); ?>
   <?php endif; ?>
   <form method="post">
     <?= csrf_field() ?><input type="hidden" name="id" value="<?= $id ?>">
-    <label>Comment (required when returning)</label><textarea name="comment" rows="2"></textarea>
+    <label>Comment (required when returning<?= budget_is_over($budgetCheck) ? ', and to approve because it is over budget' : '' ?>)</label><textarea name="comment" rows="2"></textarea>
     <div class="actions"><button class="btn" name="act" value="approve">Approve</button><button class="btn sec" name="act" value="return">Return for changes</button></div>
   </form>
 </div>
