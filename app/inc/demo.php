@@ -190,7 +190,35 @@ function demo_seed(PDO $pdo): void {
     $mk('requester', 'Replacement tyres for KDA 123X', 'returned', 'UNR', 'UNR-SUP',
         [['SPR-0003', 'All-terrain', 4, 210, '6020']],
         ['budget_holder', 'returned', 'Please attach the fleet officer\'s inspection note and check whether 2 tyres are enough.', 'budget_holder'], 'Nairobi garage', 4);
+    $mk('requester', 'Toner for Nairobi office printers', 'approved', 'UNR', 'UNR-SUP',
+        [['ITC-0001', 'HP 59A compatible', 6, 85, '7010']],
+        ['budget_holder', 'approved', '', 'budget_holder'], 'Nairobi office', 3);
     $mk('requester', 'Office stationery for Q4', 'draft', 'UNR', 'UNR-SUP',
         [['STAT-0001', '', 40, 4.80, '7010'], ['STAT-0002', '', 6, 7.50, '7010']],
         [], 'Nairobi office', 0);
+
+    // Sample sealed RFQ for the laptops PR: deadline passed, 3 bids waiting to be opened
+    $pr2 = (int)$pdo->query("SELECT id FROM pr WHERE title = 'Laptops for the M&E team'")->fetchColumn();
+    $pdo->prepare("UPDATE pr SET status = 'processing' WHERE id = ?")->execute([$pr2]);
+    $rfqId = $ins("INSERT INTO rfq (number, pr_id, title, method_name, min_quotes, sealed, currency, instructions, delivery_location, deadline, status, created_by, created_at, sent_at)
+                   VALUES (?, ?, 'Laptops for the M&E team', 'Request for quotations (RFQ)', 3, 1, 'USD', ?, 'Nairobi office', ?, 'open', ?, ?, ?)",
+        ["RFQ-$year-0001", $pr2, "Prices must include delivery to the Nairobi office.\nPlease quote in USD. Leave a price empty for any item you cannot supply.",
+         date('Y-m-d H:i:s', strtotime('-1 hour')), $uid['procurement'], date('Y-m-d H:i:s', strtotime('-5 days')), date('Y-m-d H:i:s', strtotime('-5 days'))]);
+    $rl = [];
+    foreach ($pdo->query("SELECT l.*, i.description FROM pr_lines l JOIN items i ON i.id = l.item_id WHERE l.pr_id = $pr2 ORDER BY l.line_no")->fetchAll(PDO::FETCH_ASSOC) as $l) {
+        $rl[] = [$ins('INSERT INTO rfq_lines (rfq_id, pr_line_id, line_no, item_id, description, specification, qty, unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                      [$rfqId, $l['id'], $l['line_no'], $l['item_id'], $l['description'], $l['specification'], $l['qty'], $l['unit']]), (float)$l['qty']];
+    }
+    $sup = fn(string $code) => (int)$pdo->query('SELECT id FROM suppliers WHERE code = ' . $pdo->quote($code))->fetchColumn();
+    $rh = fn($act, $sid = null, $uidv = null) => $ins('INSERT INTO rfq_history (rfq_id, user_id, supplier_id, action, created_at) VALUES (?, ?, ?, ?, ?)', [$rfqId, $uidv, $sid, $act, date('Y-m-d H:i:s', strtotime('-4 days'))]);
+    $rh('created', null, $uid['procurement']); $rh('sent', null, $uid['procurement']);
+    foreach ([['SUP-0002', [910, 11], 21, 'Dell Latitude 3440'], ['SUP-0001', [975, 9.5], 14, 'HP ProBook 440'], ['SUP-0006', [890, null], 30, 'Lenovo ThinkPad E14, no mice']] as [$sc, $prices, $days, $brand]) {
+        $sid = $sup($sc);
+        $ins("INSERT INTO rfq_suppliers (rfq_id, supplier_id, token, invited_at, email_status, viewed_at) VALUES (?, ?, ?, ?, 'Demo: emails are never sent', ?)",
+             [$rfqId, $sid, bin2hex(random_bytes(24)), date('Y-m-d H:i:s', strtotime('-5 days')), date('Y-m-d H:i:s', strtotime('-4 days'))]);
+        $qid = $ins('INSERT INTO quotes (rfq_id, supplier_id, delivery_days, validity_days, notes, submitted_at) VALUES (?, ?, ?, 30, ?, ?)', [$rfqId, $sid, $days, $brand, date('Y-m-d H:i:s', strtotime('-2 days'))]);
+        foreach ($rl as $k => [$lid]) $ins('INSERT INTO quote_lines (quote_id, rfq_line_id, unit_price, remarks) VALUES (?, ?, ?, ?)', [$qid, $lid, $prices[$k], $k === 0 ? $brand : '']);
+        $rh('bid submitted', $sid);
+    }
+    $ins("INSERT INTO pr_history (pr_id, user_id, action, comment) VALUES (?, ?, 'sent to RFQ', ?)", [$pr2, $uid['procurement'], "RFQ-$year-0001"]);
 }

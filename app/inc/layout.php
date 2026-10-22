@@ -14,6 +14,8 @@ function render_header(string $title): void {
         $nav[] = [$prLabel, 'pr.php'];
         if (has_role('procurement') || has_role('admin')) {
             $nav[] = ['Procurement', null];
+            $nWait = (int)q("SELECT COUNT(*) FROM pr WHERE status = 'approved'")->fetchColumn();
+            $nav[] = ['RFQs' . ($nWait ? " ($nWait)" : ''), 'rfq.php'];
             $nav[] = ['Suppliers', 'suppliers.php'];
         }
         if (has_role('admin')) {
@@ -23,6 +25,7 @@ function render_header(string $title): void {
             $nav[] = ['Finance codes', 'finance.php'];
             $nav[] = ['Approval thresholds', 'approvals.php'];
             $nav[] = ['Procurement methods', 'methods.php'];
+            $nav[] = ['Email settings', 'email_settings.php'];
             $nav[] = ['Item categories', 'categories.php'];
             $nav[] = ['Item catalogue', 'items.php'];
         }
@@ -47,7 +50,7 @@ function render_header(string $title): void {
 </header>
 <div class="shell">
 <nav class="side">
-<?php foreach ($nav as [$label, $href]): $isOn = $page === $href || ($href === 'pr.php' && str_starts_with($page, 'pr_')); ?>
+<?php foreach ($nav as [$label, $href]): $isOn = $page === $href || ($href === 'pr.php' && str_starts_with($page, 'pr_')) || ($href === 'rfq.php' && str_starts_with($page, 'rfq')); ?>
   <?php if ($href === null): ?><div class="nav-h"><?= e($label) ?></div>
   <?php else: ?><a href="<?= e($href) ?>" class="<?= $isOn ? 'on' : '' ?>"><?= e($label) ?></a><?php endif; ?>
 <?php endforeach; ?>

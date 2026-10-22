@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 define('APP_ROOT', dirname(__DIR__));
-define('APP_VERSION', '0.2 (Phase 1 – setup + Purchase Requests)');
+define('APP_VERSION', '0.3 (Purchase Requests + RFQs)');
 
 session_set_cookie_params(['httponly' => true, 'samesite' => 'Lax', 'secure' => !empty($_SERVER['HTTPS'])]);
 session_name('erp_session');
@@ -13,6 +13,7 @@ if (!file_exists(APP_ROOT . '/config.php')) {
     exit;
 }
 require APP_ROOT . '/config.php';
+date_default_timezone_set(defined('APP_TZ') ? APP_TZ : 'UTC');
 require __DIR__ . '/functions.php';
 require __DIR__ . '/layout.php';
 require __DIR__ . '/schema.php';
@@ -24,7 +25,6 @@ if ((int)(q("SELECT v FROM settings WHERE k = 'db_version'")->fetchColumn() ?: 0
     run_migrations(db());
 }
 
-date_default_timezone_set(defined('APP_TZ') ? APP_TZ : 'UTC');
 
 // Public demo: fresh sample data every night
 if (is_demo()) demo_reset_if_due();

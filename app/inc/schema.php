@@ -6,7 +6,7 @@ declare(strict_types=1);
  * After each deploy, the app upgrades the database by itself on the next page load —
  * no manual SQL needed.
  */
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 function schema_migrations(): array {
     return [
@@ -186,6 +186,90 @@ function schema_migrations(): array {
                 min_quotes TINYINT NOT NULL DEFAULT 1,
                 sealed TINYINT(1) NOT NULL DEFAULT 0,
                 active TINYINT(1) NOT NULL DEFAULT 1
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        ],
+        6 => [
+            "ALTER TABLE pr MODIFY status ENUM('draft','submitted','returned','approved','processing','cancelled') NOT NULL DEFAULT 'draft'",
+            "CREATE TABLE IF NOT EXISTS rfq (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                number VARCHAR(40) NOT NULL UNIQUE,
+                pr_id INT NOT NULL,
+                title VARCHAR(200) NOT NULL,
+                method_name VARCHAR(80) NOT NULL,
+                min_quotes TINYINT NOT NULL DEFAULT 1,
+                sealed TINYINT(1) NOT NULL DEFAULT 0,
+                currency CHAR(3) NOT NULL,
+                instructions TEXT,
+                delivery_location VARCHAR(200) NOT NULL DEFAULT '',
+                deadline DATETIME NULL,
+                status ENUM('draft','open','closed','cancelled') NOT NULL DEFAULT 'draft',
+                created_by INT NOT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                sent_at DATETIME NULL,
+                opened_at DATETIME NULL,
+                opened_by INT NULL,
+                KEY ix_pr (pr_id),
+                CONSTRAINT fk_rfq_pr FOREIGN KEY (pr_id) REFERENCES pr(id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS rfq_lines (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                rfq_id INT NOT NULL,
+                pr_line_id INT NULL,
+                line_no SMALLINT NOT NULL,
+                item_id INT NOT NULL,
+                description VARCHAR(255) NOT NULL,
+                specification VARCHAR(500) NOT NULL DEFAULT '',
+                qty DECIMAL(14,3) NOT NULL,
+                unit VARCHAR(30) NOT NULL,
+                KEY ix_rfq (rfq_id),
+                CONSTRAINT fk_rfql_rfq FOREIGN KEY (rfq_id) REFERENCES rfq(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS rfq_suppliers (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                rfq_id INT NOT NULL,
+                supplier_id INT NOT NULL,
+                token CHAR(48) NULL UNIQUE,
+                invited_at DATETIME NULL,
+                email_status VARCHAR(255) NULL,
+                viewed_at DATETIME NULL,
+                declined_at DATETIME NULL,
+                UNIQUE KEY uq_rfq_sup (rfq_id, supplier_id),
+                CONSTRAINT fk_rs_rfq FOREIGN KEY (rfq_id) REFERENCES rfq(id) ON DELETE CASCADE,
+                CONSTRAINT fk_rs_sup FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS quotes (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                rfq_id INT NOT NULL,
+                supplier_id INT NOT NULL,
+                delivery_days SMALLINT NULL,
+                validity_days SMALLINT NULL,
+                notes TEXT,
+                entered_by INT NULL,
+                submitted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_quote (rfq_id, supplier_id),
+                CONSTRAINT fk_q_rfq FOREIGN KEY (rfq_id) REFERENCES rfq(id) ON DELETE CASCADE,
+                CONSTRAINT fk_q_sup FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS quote_lines (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                quote_id INT NOT NULL,
+                rfq_line_id INT NOT NULL,
+                unit_price DECIMAL(14,2) NULL,
+                remarks VARCHAR(255) NOT NULL DEFAULT '',
+                UNIQUE KEY uq_ql (quote_id, rfq_line_id),
+                CONSTRAINT fk_ql_q FOREIGN KEY (quote_id) REFERENCES quotes(id) ON DELETE CASCADE,
+                CONSTRAINT fk_ql_l FOREIGN KEY (rfq_line_id) REFERENCES rfq_lines(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS rfq_history (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                rfq_id INT NOT NULL,
+                user_id INT NULL,
+                supplier_id INT NULL,
+                action VARCHAR(60) NOT NULL,
+                comment TEXT,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY ix_rfq (rfq_id),
+                CONSTRAINT fk_rh_rfq FOREIGN KEY (rfq_id) REFERENCES rfq(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         ],
     ];

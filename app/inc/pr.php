@@ -7,6 +7,7 @@ const PR_STATUS = [
     'submitted' => ['Awaiting approval', ''],
     'returned'  => ['Returned for changes', 'warn'],
     'approved'  => ['Approved', 'stock'],
+    'processing'=> ['In procurement', ''],
     'cancelled' => ['Cancelled', 'off'],
 ];
 

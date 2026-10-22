@@ -21,7 +21,7 @@ render_header('Dashboard'); ?>
   <a class="tile" href="pr.php?tab=approve" style="text-decoration:none;color:inherit"><span class="muted">Waiting for my approval</span><b><?= $pc['to_approve'] + $pc['self_blocked'] ?></b></a>
   <?php endif; ?>
   <?php if (has_role('procurement') || has_role('admin')): ?>
-  <a class="tile" href="pr.php?tab=all&status=approved" style="text-decoration:none;color:inherit"><span class="muted">Approved, waiting for Procurement</span><b><?= $pc['approved'] ?></b></a>
+  <a class="tile" href="rfq.php" style="text-decoration:none;color:inherit"><span class="muted">Approved, waiting for an RFQ</span><b><?= $pc['approved'] ?></b></a>
   <?php endif; ?>
   <?php if (has_role('requester')): ?>
   <a class="tile" href="pr_edit.php" style="text-decoration:none;color:inherit;border-style:dashed"><span class="muted">Start a</span><b style="font-size:17px">+ New Purchase Request</b></a>

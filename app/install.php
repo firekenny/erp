@@ -42,6 +42,7 @@ if (!$locked && $_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (!$errors) {
+        date_default_timezone_set($demo ? 'Africa/Nairobi' : 'Europe/Kyiv');
         try {
             $pdo = new PDO('mysql:host=' . $in['db_host'] . ';dbname=' . $in['db_name'] . ';charset=utf8mb4', $in['db_user'], $dbPass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
         } catch (Throwable $e) {
@@ -50,6 +51,7 @@ if (!$locked && $_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     if (!$errors) {
         try {
+            $pdo->exec("SET time_zone = '" . date('P') . "'");
             run_migrations($pdo);
             if ($demo) {
                 demo_seed($pdo);

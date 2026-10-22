@@ -111,11 +111,18 @@ render_header($pr['number']); ?>
   <?php if ($method): ?>
     <p style="margin:0">Total <?= number_format(pr_total($lines), 2) ?> <?= e($pr['currency']) ?> → <b><?= e($method['name']) ?></b>:
       at least <b><?= (int)$method['min_quotes'] ?> quote<?= (int)$method['min_quotes'] > 1 ? 's' : '' ?></b><?= $method['sealed'] ? ', submitted as <b>sealed bids</b> through supplier links' : ', entered by the procurement officer' ?>.</p>
-    <p class="muted" style="margin-bottom:0">Creating the RFQ from this request is the next build step.</p>
+    <form method="post" action="rfq_view.php" class="actions"><?= csrf_field() ?><input type="hidden" name="act" value="create"><input type="hidden" name="pr_id" value="<?= $id ?>"><button class="btn">Create RFQ</button></form>
   <?php else: ?>
     <p class="flash warn" style="margin:0">No procurement method covers this amount. An Administrator must set up <a href="methods.php">Procurement methods</a>.</p>
   <?php endif; ?>
 </div>
+<?php endif; ?>
+
+<?php $rfqs = q('SELECT id, number, status FROM rfq WHERE pr_id = ? ORDER BY id', [$id])->fetchAll();
+if ($rfqs && (has_role('procurement') || has_role('admin'))): ?>
+<div class="flash noprint" style="background:#e8f0f8;color:#1f4e79">Procurement: <?php foreach ($rfqs as $r): ?><a href="rfq_view.php?id=<?= (int)$r['id'] ?>"><b><?= e($r['number']) ?></b></a> (<?= e($r['status']) ?>) <?php endforeach; ?></div>
+<?php elseif ($pr['status'] === 'processing'): ?>
+<div class="flash noprint" style="background:#e8f0f8;color:#1f4e79">Procurement is now sourcing this request.</div>
 <?php endif; ?>
 
 <div class="card">
