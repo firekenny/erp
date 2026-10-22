@@ -7,6 +7,13 @@ $canAll = has_role('procurement') || has_role('admin');
 $tabs = [];
 if (has_role('requester')) $tabs['mine'] = 'My requests';
 if (has_role('budget_holder') || has_role('admin')) $tabs['approve'] = 'To approve';
+$awardsToApprove = [];
+if ((has_role('budget_holder') || has_role('admin'))) {
+    foreach (q("SELECT DISTINCT r.id FROM award_approvals a JOIN rfq r ON r.id = a.rfq_id WHERE r.award_status = 'submitted' AND a.status = 'pending'")->fetchAll(PDO::FETCH_COLUMN) as $rid) {
+        $r = rfq_get((int)$rid);
+        if ($r && award_decidable($r, $u)) $awardsToApprove[] = $r;
+    }
+}
 if ($canAll) $tabs['all'] = 'All requests';
 if (!$tabs) { render_header('Purchase Requests'); echo '<div class="card">Your role has no access to Purchase Requests.</div>'; render_footer(); exit; }
 
@@ -40,7 +47,7 @@ render_header('Purchase Requests'); ?>
 <div class="actions" style="margin:0 0 12px">
   <?php foreach ($tabs as $k => $label): ?>
     <a class="btn small <?= $k === $tab ? '' : 'sec' ?>" href="?tab=<?= $k ?>"><?= e($label) ?><?php
-      if ($k === 'approve' && $counts['to_approve'] + $counts['self_blocked']) echo ' (' . ($counts['to_approve'] + $counts['self_blocked']) . ')'; ?></a>
+      if ($k === 'approve' && $counts['to_approve'] + $counts['self_blocked'] + count($awardsToApprove)) echo ' (' . ($counts['to_approve'] + $counts['self_blocked'] + count($awardsToApprove)) . ')'; ?></a>
   <?php endforeach; ?>
   <?php if (has_role('requester')): ?><a class="btn" href="pr_edit.php" style="margin-left:auto">+ New Purchase Request</a><?php endif; ?>
 </div>
@@ -56,6 +63,18 @@ render_header('Purchase Requests'); ?>
 </form>
 <?php endif; ?>
 
+<?php if ($tab === 'approve' && $awardsToApprove): ?>
+<h2>Supplier awards waiting for your approval</h2>
+<div class="table-wrap" style="margin-bottom:16px"><table>
+  <tr><th>RFQ</th><th>Title</th><th style="text-align:right">Award total</th><th></th></tr>
+  <?php foreach ($awardsToApprove as $r): ?>
+  <tr><td><b><?= e($r['number']) ?></b><br><span class="muted"><?= e($r['pr_number']) ?></span></td><td><?= e($r['title']) ?></td>
+    <td style="text-align:right;white-space:nowrap"><?= number_format((float)$r['award_total'], 2) ?> <?= e($r['currency']) ?></td>
+    <td><a class="btn small" href="rfq_eval.php?id=<?= (int)$r['id'] ?>">Review award</a></td></tr>
+  <?php endforeach; ?>
+</table></div>
+<h2>Purchase Requests</h2>
+<?php endif; ?>
 <div class="table-wrap"><table>
   <tr><th>Number</th><th>Title</th><?php if ($tab !== 'mine'): ?><th>Requester</th><?php endif; ?><th>Needed by</th><th style="text-align:right">Est. total</th><th>Status</th></tr>
   <?php if (!$rows): ?><tr><td colspan="6" class="muted"><?= $tab === 'approve' ? 'Nothing waiting for your approval.' : 'No Purchase Requests yet.' ?></td></tr><?php endif; ?>

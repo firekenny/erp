@@ -6,7 +6,7 @@ declare(strict_types=1);
  * After each deploy, the app upgrades the database by itself on the next page load —
  * no manual SQL needed.
  */
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 
 function schema_migrations(): array {
     return [
@@ -270,6 +270,115 @@ function schema_migrations(): array {
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 KEY ix_rfq (rfq_id),
                 CONSTRAINT fk_rh_rfq FOREIGN KEY (rfq_id) REFERENCES rfq(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        ],
+        7 => [
+            "ALTER TABLE pr MODIFY status ENUM('draft','submitted','returned','approved','processing','ordered','cancelled') NOT NULL DEFAULT 'draft'",
+            "ALTER TABLE rfq MODIFY status ENUM('draft','open','closed','awarded','cancelled') NOT NULL DEFAULT 'draft'",
+            "ALTER TABLE rfq ADD COLUMN award_status ENUM('none','submitted','returned','approved') NOT NULL DEFAULT 'none',
+                ADD COLUMN award_justification TEXT NULL,
+                ADD COLUMN award_total DECIMAL(14,2) NULL,
+                ADD COLUMN award_submitted_by INT NULL,
+                ADD COLUMN award_submitted_at DATETIME NULL,
+                ADD COLUMN award_approved_at DATETIME NULL",
+            "ALTER TABLE quotes ADD COLUMN compliant TINYINT(1) NULL, ADD COLUMN compliance_note VARCHAR(255) NOT NULL DEFAULT ''",
+            "CREATE TABLE IF NOT EXISTS rfq_criteria (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                rfq_id INT NOT NULL,
+                name VARCHAR(120) NOT NULL,
+                weight DECIMAL(5,2) NOT NULL,
+                is_price TINYINT(1) NOT NULL DEFAULT 0,
+                sort SMALLINT NOT NULL DEFAULT 0,
+                KEY ix_rfq (rfq_id),
+                CONSTRAINT fk_rc_rfq FOREIGN KEY (rfq_id) REFERENCES rfq(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "INSERT INTO rfq_criteria (rfq_id, name, weight, is_price, sort) SELECT id, 'Price', 70, 1, 0 FROM rfq",
+            "INSERT INTO rfq_criteria (rfq_id, name, weight, is_price, sort) SELECT id, 'Delivery time', 15, 0, 1 FROM rfq",
+            "INSERT INTO rfq_criteria (rfq_id, name, weight, is_price, sort) SELECT id, 'Quality / technical compliance', 15, 0, 2 FROM rfq",
+            "CREATE TABLE IF NOT EXISTS rfq_scores (
+                rfq_id INT NOT NULL,
+                criterion_id INT NOT NULL,
+                supplier_id INT NOT NULL,
+                score DECIMAL(4,1) NOT NULL,
+                PRIMARY KEY (criterion_id, supplier_id),
+                KEY ix_rfq (rfq_id),
+                CONSTRAINT fk_rsc_c FOREIGN KEY (criterion_id) REFERENCES rfq_criteria(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS rfq_awards (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                rfq_id INT NOT NULL,
+                rfq_line_id INT NOT NULL,
+                supplier_id INT NOT NULL,
+                unit_price DECIMAL(14,2) NOT NULL,
+                recommended TINYINT(1) NOT NULL DEFAULT 1,
+                UNIQUE KEY uq_line (rfq_line_id),
+                KEY ix_rfq (rfq_id),
+                CONSTRAINT fk_ra_rfq FOREIGN KEY (rfq_id) REFERENCES rfq(id) ON DELETE CASCADE,
+                CONSTRAINT fk_ra_line FOREIGN KEY (rfq_line_id) REFERENCES rfq_lines(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS award_approvals (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                rfq_id INT NOT NULL,
+                approver_id INT NOT NULL,
+                fin_value_id INT NULL,
+                stage TINYINT NOT NULL DEFAULT 1,
+                level_name VARCHAR(80) NULL,
+                status ENUM('pending','approved','returned') NOT NULL DEFAULT 'pending',
+                comment TEXT,
+                decided_by INT NULL,
+                decided_at DATETIME NULL,
+                KEY ix_rfq (rfq_id), KEY ix_appr (approver_id, status),
+                CONSTRAINT fk_aa_rfq FOREIGN KEY (rfq_id) REFERENCES rfq(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS po (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                number VARCHAR(40) NOT NULL UNIQUE,
+                rfq_id INT NULL,
+                pr_id INT NOT NULL,
+                supplier_id INT NOT NULL,
+                currency CHAR(3) NOT NULL,
+                delivery_location VARCHAR(200) NOT NULL DEFAULT '',
+                delivery_date DATE NULL,
+                payment_terms TEXT,
+                terms TEXT,
+                notes TEXT,
+                status ENUM('issued','acknowledged','partially_received','received','cancelled') NOT NULL DEFAULT 'issued',
+                token CHAR(48) NOT NULL UNIQUE,
+                email_status VARCHAR(255) NULL,
+                created_by INT NOT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                acknowledged_at DATETIME NULL,
+                acknowledged_name VARCHAR(120) NULL,
+                KEY ix_pr (pr_id), KEY ix_sup (supplier_id),
+                CONSTRAINT fk_po_pr FOREIGN KEY (pr_id) REFERENCES pr(id),
+                CONSTRAINT fk_po_sup FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS po_lines (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                po_id INT NOT NULL,
+                line_no SMALLINT NOT NULL,
+                rfq_line_id INT NULL,
+                pr_line_id INT NULL,
+                item_id INT NOT NULL,
+                description VARCHAR(255) NOT NULL,
+                specification VARCHAR(500) NOT NULL DEFAULT '',
+                remarks VARCHAR(255) NOT NULL DEFAULT '',
+                qty DECIMAL(14,3) NOT NULL,
+                unit VARCHAR(30) NOT NULL,
+                unit_price DECIMAL(14,2) NOT NULL,
+                fin1_id INT NULL, fin2_id INT NULL, fin3_id INT NULL, fin4_id INT NULL,
+                KEY ix_po (po_id),
+                CONSTRAINT fk_pol_po FOREIGN KEY (po_id) REFERENCES po(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS po_history (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                po_id INT NOT NULL,
+                user_id INT NULL,
+                action VARCHAR(60) NOT NULL,
+                comment TEXT,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY ix_po (po_id),
+                CONSTRAINT fk_poh_po FOREIGN KEY (po_id) REFERENCES po(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         ],
     ];

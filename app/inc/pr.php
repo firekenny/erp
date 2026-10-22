@@ -8,6 +8,7 @@ const PR_STATUS = [
     'returned'  => ['Returned for changes', 'warn'],
     'approved'  => ['Approved', 'stock'],
     'processing'=> ['In procurement', ''],
+    'ordered'   => ['Ordered', 'stock'],
     'cancelled' => ['Cancelled', 'off'],
 ];
 

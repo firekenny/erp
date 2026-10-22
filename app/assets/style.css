@@ -68,4 +68,6 @@ details summary{cursor:pointer;font-weight:600}
   main{padding:0;max-width:none}
   .card,.table-wrap{border:1px solid #ccc;break-inside:avoid}
   th,td{padding:4px 6px}
+  .fin{display:none}
+  main>h1{display:none}
 }

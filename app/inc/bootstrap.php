@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 define('APP_ROOT', dirname(__DIR__));
-define('APP_VERSION', '0.3 (Purchase Requests + RFQs)');
+define('APP_VERSION', '0.4 (Purchase Requests, RFQs, award and Purchase Orders)');
 
 session_set_cookie_params(['httponly' => true, 'samesite' => 'Lax', 'secure' => !empty($_SERVER['HTTPS'])]);
 session_name('erp_session');
@@ -19,6 +19,7 @@ require __DIR__ . '/layout.php';
 require __DIR__ . '/schema.php';
 require __DIR__ . '/demo.php';
 require_once __DIR__ . '/pr.php';
+require_once __DIR__ . '/award.php';
 
 // Upgrade the database automatically after a new version is deployed
 if ((int)(q("SELECT v FROM settings WHERE k = 'db_version'")->fetchColumn() ?: 0) < SCHEMA_VERSION) {

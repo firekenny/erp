@@ -1,6 +1,6 @@
 <?php
 require __DIR__ . '/inc/bootstrap.php';
-require_once __DIR__ . '/inc/rfq.php';
+require_once __DIR__ . '/inc/award.php';
 $u = require_any(['procurement', 'admin']);
 
 /* ---------- Create from an approved PR ---------- */
@@ -22,6 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['act'] ?? '') === 'create')
     }
     q("UPDATE pr SET status = 'processing' WHERE id = ?", [$pr['id']]);
     pr_log((int)$pr['id'], 'sent to RFQ', q('SELECT number FROM rfq WHERE id = ?', [$rid])->fetchColumn());
+    rfq_default_criteria($rid);
     rfq_log($rid, 'created', 'From ' . $pr['number'] . ' · ' . $method['name']);
     db()->commit();
     flash('RFQ created. Choose the suppliers and check the deadline, then send it.');
@@ -49,6 +50,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($rfq['status'] === 'open' && $fields['deadline'] !== $rfq['deadline']) rfq_log($id, 'deadline changed', 'New deadline ' . ($fields['deadline'] ?? 'none'));
         flash('Saved.'); $back();
     }
+    if ($act === 'criteria' && $rfq['status'] === 'draft') {
+        $names = (array)($_POST['cname'] ?? []); $weights = (array)($_POST['cweight'] ?? []);
+        $rows = [];
+        foreach ($names as $k => $n) {
+            $n = trim((string)$n); $w = (float)str_replace(',', '.', (string)($weights[$k] ?? 0));
+            if ($n === '' || $w <= 0) continue;
+            $rows[] = ['name' => mb_substr($n, 0, 120), 'weight' => $w, 'is_price' => $k === 'price' ? 1 : 0];
+        }
+        if (!array_filter($rows, fn($r) => $r['is_price'])) $rows[] = ['name' => 'Price', 'weight' => 0, 'is_price' => 1];
+        q('DELETE FROM rfq_criteria WHERE rfq_id = ?', [$id]);
+        foreach ($rows as $i => $r) q('INSERT INTO rfq_criteria (rfq_id, name, weight, is_price, sort) VALUES (?, ?, ?, ?, ?)', [$id, $r['name'], $r['weight'], $r['is_price'], $i]);
+        $errs = criteria_errors($rows);
+        flash($errs ? 'Criteria saved, but: ' . implode(' ', $errs) : 'Evaluation criteria saved.', $errs ? 'warn' : 'ok'); $back();
+    }
     if ($act === 'suppliers' && $rfq['status'] === 'draft') {
         $ids = array_map('intval', (array)($_POST['sup'] ?? []));
         q('DELETE FROM rfq_suppliers WHERE rfq_id = ?', [$id]);
@@ -63,6 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$rfq['deadline'] || strtotime($rfq['deadline']) <= time()) $errs[] = 'Set a deadline in the future.';
         }
         if (!rfq_lines($id)) $errs[] = 'The RFQ has no lines.';
+        $errs = array_merge($errs, criteria_errors(rfq_criteria($id)));
         if ($errs) { flash(implode(' ', $errs), 'err'); $back(); }
         q("UPDATE rfq SET status = 'open', sent_at = NOW() WHERE id = ?", [$id]);
         $rfq = rfq_get($id);
@@ -120,8 +136,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($n === 0) { flash('No quotes received yet.', 'err'); $back(); }
         q("UPDATE rfq SET status = 'closed' WHERE id = ?", [$id]);
         rfq_log($id, 'closed', "$n quote(s)");
-        flash($n < (int)$rfq['min_quotes'] ? "Closed with $n quote(s), fewer than the {$rfq['min_quotes']} required: the award will need a written justification." : 'RFQ closed. It is ready for evaluation and award.', $n < (int)$rfq['min_quotes'] ? 'warn' : 'ok');
-        $back();
+        flash($n < (int)$rfq['min_quotes'] ? "Closed with $n quote(s), fewer than the {$rfq['min_quotes']} required: the award will need a written justification." : 'RFQ closed. Now evaluate the offers.', $n < (int)$rfq['min_quotes'] ? 'warn' : 'ok');
+        redirect("rfq_eval.php?id=$id");
     }
     if ($act === 'cancel' && in_array($rfq['status'], ['draft', 'open'], true)) {
         q("UPDATE rfq SET status = 'cancelled' WHERE id = ?", [$id]);
@@ -216,7 +232,7 @@ if ($visible && $quotes):
   <tr><td colspan="3" style="text-align:right" class="muted">Notes · source</td>
     <?php foreach ($quotes as $q): ?><td style="text-align:right;font-size:12px" class="muted"><?= e($q['quote']['notes']) ?><?= $q['quote']['notes'] ? '<br>' : '' ?><?= $q['quote']['entered_by'] ? 'entered by procurement' : 'submitted online' ?>, <?= e(date('d M H:i', strtotime($q['quote']['submitted_at']))) ?></td><?php endforeach; ?></tr>
 </table></div>
-<p class="muted">Green = lowest price per line and lowest complete total. Evaluation and award (including split awards by line) are the next build step.</p>
+<p class="muted">Green = lowest price per line and lowest complete total. Weighted scoring and the award are on the evaluation page once the RFQ is closed.</p>
 <?php else: ?>
 <h2>Lines</h2>
 <div class="table-wrap"><table>
@@ -224,6 +240,28 @@ if ($visible && $quotes):
   <?php foreach ($lines as $l): ?><tr><td><?= (int)$l['line_no'] ?></td><td><?= e($l['description']) ?></td><td><?= e($l['specification']) ?></td><td style="text-align:right;white-space:nowrap"><?= $fmtQty($l['qty']) ?> <?= e($l['unit']) ?></td></tr><?php endforeach; ?>
 </table></div>
 <?php endif; ?>
+
+<?php $crit = rfq_criteria($id); ?>
+<div class="card noprint">
+  <h2>Evaluation criteria <span class="muted" style="font-weight:400">· shown to suppliers</span></h2>
+  <?php if ($rfq['status'] === 'draft'): ?>
+  <form method="post"><?= csrf_field() ?><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="act" value="criteria">
+    <table id="crit">
+      <tr><th>Criterion</th><th style="width:140px">Weight %</th></tr>
+      <?php foreach ($crit as $i => $c): $key = $c['is_price'] ? 'price' : 'c' . $i; ?>
+      <tr><td><input type="text" name="cname[<?= $key ?>]" value="<?= e($c['name']) ?>" <?= $c['is_price'] ? 'readonly' : '' ?>><?= $c['is_price'] ? '<span class="muted">Calculated automatically from the prices</span>' : '' ?></td>
+        <td><input type="number" name="cweight[<?= $key ?>]" value="<?= e(rtrim(rtrim((string)$c['weight'], '0'), '.')) ?>" min="0" max="100" step="1" class="cw"></td></tr>
+      <?php endforeach; ?>
+      <?php for ($k = 0; $k < 2; $k++): ?><tr><td><input type="text" name="cname[n<?= $k ?>]" placeholder="Add a criterion (e.g. Warranty, After-sales service)"></td><td><input type="number" name="cweight[n<?= $k ?>]" min="0" max="100" step="1" class="cw"></td></tr><?php endfor; ?>
+      <tr><td style="text-align:right">Total</td><td><b id="cwt"></b></td></tr>
+    </table>
+    <div class="actions"><button class="btn sec">Save criteria</button><span class="muted">Price must stay; weights must total 100. To remove a criterion, empty its weight.</span></div>
+  </form>
+  <script>(function(){function t(){let s=0;document.querySelectorAll('.cw').forEach(i=>s+=parseFloat(i.value)||0);const b=document.getElementById('cwt');b.textContent=s+'%';b.style.color=Math.abs(s-100)<0.01?'':'#a12a20';}document.querySelectorAll('.cw').forEach(i=>i.addEventListener('input',t));t();})();</script>
+  <?php else: ?>
+  <p style="margin:0"><?php foreach ($crit as $c): ?><span class="tag"><?= e($c['name']) ?> <?= rtrim(rtrim((string)$c['weight'], '0'), '.') ?>%</span> <?php endforeach; ?></p>
+  <?php endif; ?>
+</div>
 
 <?php /* ---------- Suppliers ---------- */ ?>
 <div class="card noprint" style="margin-top:16px">
@@ -319,7 +357,7 @@ if ($rfq['status'] === 'open' && !$rfq['sealed']):
         <form method="post" style="margin-top:8px" onsubmit="return confirm('Cancel this RFQ? The Purchase Request goes back to the approved queue.')"><?= csrf_field() ?><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="act" value="cancel">
           <input type="text" name="comment" placeholder="Reason"><button class="btn danger small" style="margin-top:6px">Confirm cancellation</button></form></details>
     <?php endif; ?>
-    <?php if ($rfq['status'] === 'closed'): ?><span class="muted">Next: evaluation, award and Purchase Order (coming in the next build step).</span><?php endif; ?>
+    <?php if (in_array($rfq['status'], ['closed', 'awarded'], true)): ?><a class="btn" href="rfq_eval.php?id=<?= $id ?>"><?= $rfq['status'] === 'awarded' ? 'View evaluation, award and Purchase Orders' : 'Evaluate and award' ?></a><?php endif; ?>
   </div>
 </div>
 

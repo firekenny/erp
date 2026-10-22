@@ -204,6 +204,9 @@ function demo_seed(PDO $pdo): void {
                    VALUES (?, ?, 'Laptops for the M&E team', 'Request for quotations (RFQ)', 3, 1, 'USD', ?, 'Nairobi office', ?, 'open', ?, ?, ?)",
         ["RFQ-$year-0001", $pr2, "Prices must include delivery to the Nairobi office.\nPlease quote in USD. Leave a price empty for any item you cannot supply.",
          date('Y-m-d H:i:s', strtotime('-1 hour')), $uid['procurement'], date('Y-m-d H:i:s', strtotime('-5 days')), date('Y-m-d H:i:s', strtotime('-5 days'))]);
+    foreach ([['Price', 70, 1], ['Delivery time', 15, 0], ['Quality / technical compliance', 15, 0]] as $i => [$cn, $cw, $cp]) {
+        $ins('INSERT INTO rfq_criteria (rfq_id, name, weight, is_price, sort) VALUES (?, ?, ?, ?, ?)', [$rfqId, $cn, $cw, $cp, $i]);
+    }
     $rl = [];
     foreach ($pdo->query("SELECT l.*, i.description FROM pr_lines l JOIN items i ON i.id = l.item_id WHERE l.pr_id = $pr2 ORDER BY l.line_no")->fetchAll(PDO::FETCH_ASSOC) as $l) {
         $rl[] = [$ins('INSERT INTO rfq_lines (rfq_id, pr_line_id, line_no, item_id, description, specification, qty, unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',

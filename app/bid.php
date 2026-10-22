@@ -1,7 +1,7 @@
 <?php
 /* Public page for suppliers: opened through their personal link, no account needed */
 require __DIR__ . '/inc/bootstrap.php';
-require_once __DIR__ . '/inc/rfq.php';
+require_once __DIR__ . '/inc/award.php';
 
 $token = (string)($_GET['t'] ?? $_POST['t'] ?? '');
 $rs = preg_match('/^[a-f0-9]{48}$/', $token)
@@ -11,7 +11,7 @@ $rfq = $rs ? rfq_get((int)$rs['rfq_id']) : null;
 
 function bid_page_start(string $title): void { ?><!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">
-<title><?= e($title) ?></title><link rel="stylesheet" href="assets/style.css?v=3"></head><body>
+<title><?= e($title) ?></title><link rel="stylesheet" href="assets/style.css?v=5"></head><body>
 <?php if (is_demo()): ?><div class="demo-bar">Demo version · this is the page a supplier sees when opening their personal link</div><?php endif; ?>
 <header class="topbar"><span class="brand"><?= e(setting('org_name')) ?></span><span class="who">Supplier quotation</span></header>
 <main style="max-width:980px;margin:0 auto"><?php foreach (flash() ?? [] as $f): ?><div class="flash <?= e($f['type']) ?>"><?= e($f['msg']) ?></div><?php endforeach;
@@ -65,6 +65,7 @@ bid_page_start($rfq['number']); ?>
     <div><span class="muted">Currency</span><br><?= e($rfq['currency']) ?></div>
   </div>
   <?php if ($rfq['instructions']): ?><p style="margin-bottom:0"><span class="muted">Instructions</span><br><?= nl2br(e($rfq['instructions'])) ?></p><?php endif; ?>
+  <p style="margin-bottom:0"><span class="muted">Offers will be evaluated on</span><br><?php foreach (rfq_criteria((int)$rfq['id']) as $c): ?><span class="tag"><?= e($c['name']) ?> <?= rtrim(rtrim((string)$c['weight'], '0'), '.') ?>%</span> <?php endforeach; ?></p>
 </div>
 
 <?php if (!rfq_accepting_bids($rfq)): ?>

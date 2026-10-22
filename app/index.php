@@ -18,7 +18,7 @@ render_header('Dashboard'); ?>
   <a class="tile" href="pr.php?tab=mine" style="text-decoration:none;color:inherit"><span class="muted">My open requests</span><b><?= $pc['my_open'] ?></b><?php if ($pc['returned']): ?><span class="tag warn"><?= $pc['returned'] ?> returned to you</span><?php endif; ?></a>
   <?php endif; ?>
   <?php if (has_role('budget_holder') || has_role('admin')): ?>
-  <a class="tile" href="pr.php?tab=approve" style="text-decoration:none;color:inherit"><span class="muted">Waiting for my approval</span><b><?= $pc['to_approve'] + $pc['self_blocked'] ?></b></a>
+  <a class="tile" href="pr.php?tab=approve" style="text-decoration:none;color:inherit"><span class="muted">Waiting for my approval</span><b><?= $pc['to_approve'] + $pc['self_blocked'] + award_pending_count($u) ?></b></a>
   <?php endif; ?>
   <?php if (has_role('procurement') || has_role('admin')): ?>
   <a class="tile" href="rfq.php" style="text-decoration:none;color:inherit"><span class="muted">Approved, waiting for an RFQ</span><b><?= $pc['approved'] ?></b></a>

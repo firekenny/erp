@@ -10,12 +10,13 @@ function render_header(string $title): void {
         $nav[] = ['Main', null];
         $nav[] = ['Dashboard', 'index.php'];
         $prLabel = 'Purchase Requests';
-        if (function_exists('pr_counts')) { $c = pr_counts($u); $n = $c['to_approve'] + $c['self_blocked'] + $c['returned']; if ($n) $prLabel .= " ($n)"; }
+        if (function_exists('pr_counts')) { $c = pr_counts($u); $n = $c['to_approve'] + $c['self_blocked'] + $c['returned'] + (function_exists('award_pending_count') ? award_pending_count($u) : 0); if ($n) $prLabel .= " ($n)"; }
         $nav[] = [$prLabel, 'pr.php'];
         if (has_role('procurement') || has_role('admin')) {
             $nav[] = ['Procurement', null];
             $nWait = (int)q("SELECT COUNT(*) FROM pr WHERE status = 'approved'")->fetchColumn();
             $nav[] = ['RFQs' . ($nWait ? " ($nWait)" : ''), 'rfq.php'];
+            $nav[] = ['Purchase Orders', 'po.php'];
             $nav[] = ['Suppliers', 'suppliers.php'];
         }
         if (has_role('admin')) {
@@ -36,7 +37,7 @@ function render_header(string $title): void {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= e($title) ?> · <?= e($org) ?></title>
-<link rel="stylesheet" href="assets/style.css?v=3">
+<link rel="stylesheet" href="assets/style.css?v=5">
 </head>
 <body>
 <?php if (function_exists('is_demo') && is_demo()): ?>
@@ -50,7 +51,7 @@ function render_header(string $title): void {
 </header>
 <div class="shell">
 <nav class="side">
-<?php foreach ($nav as [$label, $href]): $isOn = $page === $href || ($href === 'pr.php' && str_starts_with($page, 'pr_')) || ($href === 'rfq.php' && str_starts_with($page, 'rfq')); ?>
+<?php foreach ($nav as [$label, $href]): $isOn = $page === $href || ($href === 'pr.php' && str_starts_with($page, 'pr_')) || ($href === 'rfq.php' && str_starts_with($page, 'rfq')) || ($href === 'po.php' && str_starts_with($page, 'po_')); ?>
   <?php if ($href === null): ?><div class="nav-h"><?= e($label) ?></div>
   <?php else: ?><a href="<?= e($href) ?>" class="<?= $isOn ? 'on' : '' ?>"><?= e($label) ?></a><?php endif; ?>
 <?php endforeach; ?>

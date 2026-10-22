@@ -7,7 +7,8 @@ require_once __DIR__ . '/mail.php';
 const RFQ_STATUS = [
     'draft'     => ['Draft', 'off'],
     'open'      => ['Open for quotes', ''],
-    'closed'    => ['Closed, ready for award', 'stock'],
+    'closed'    => ['Closed, under evaluation', ''],
+    'awarded'   => ['Awarded', 'stock'],
     'cancelled' => ['Cancelled', 'off'],
 ];
 
