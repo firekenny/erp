@@ -1,0 +1,6 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/c1380736c/public_html/erp/
+    - /bin/mkdir -p $DEPLOYPATH
+    - /bin/cp -R app/. $DEPLOYPATH
