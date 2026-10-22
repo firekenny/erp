@@ -6,7 +6,7 @@ declare(strict_types=1);
  * After each deploy, the app upgrades the database by itself on the next page load —
  * no manual SQL needed.
  */
-const SCHEMA_VERSION = 7;
+const SCHEMA_VERSION = 8;
 
 function schema_migrations(): array {
     return [
@@ -379,6 +379,97 @@ function schema_migrations(): array {
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 KEY ix_po (po_id),
                 CONSTRAINT fk_poh_po FOREIGN KEY (po_id) REFERENCES po(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        ],
+        8 => [
+            "CREATE TABLE IF NOT EXISTS warehouses (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                code VARCHAR(20) NOT NULL UNIQUE,
+                name VARCHAR(120) NOT NULL,
+                address VARCHAR(255) NOT NULL DEFAULT '',
+                active TINYINT(1) NOT NULL DEFAULT 1
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS grn (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                number VARCHAR(40) NOT NULL UNIQUE,
+                po_id INT NOT NULL,
+                warehouse_id INT NOT NULL,
+                received_date DATE NOT NULL,
+                delivery_note VARCHAR(80) NOT NULL DEFAULT '',
+                notes TEXT,
+                received_by INT NOT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY ix_po (po_id),
+                CONSTRAINT fk_grn_po FOREIGN KEY (po_id) REFERENCES po(id),
+                CONSTRAINT fk_grn_wh FOREIGN KEY (warehouse_id) REFERENCES warehouses(id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS grn_lines (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                grn_id INT NOT NULL,
+                po_line_id INT NOT NULL,
+                item_id INT NOT NULL,
+                line_type ENUM('stock','asset','service') NOT NULL,
+                qty_received DECIMAL(14,3) NOT NULL,
+                qty_rejected DECIMAL(14,3) NOT NULL DEFAULT 0,
+                reject_reason VARCHAR(255) NOT NULL DEFAULT '',
+                unit_price DECIMAL(14,2) NOT NULL,
+                bin VARCHAR(60) NOT NULL DEFAULT '',
+                batch_no VARCHAR(60) NOT NULL DEFAULT '',
+                expiry_date DATE NULL,
+                KEY ix_grn (grn_id), KEY ix_pol (po_line_id),
+                CONSTRAINT fk_grnl_grn FOREIGN KEY (grn_id) REFERENCES grn(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS stock (
+                item_id INT NOT NULL,
+                warehouse_id INT NOT NULL,
+                qty DECIMAL(14,3) NOT NULL DEFAULT 0,
+                avg_cost DECIMAL(14,4) NOT NULL DEFAULT 0,
+                PRIMARY KEY (item_id, warehouse_id),
+                CONSTRAINT fk_st_item FOREIGN KEY (item_id) REFERENCES items(id),
+                CONSTRAINT fk_st_wh FOREIGN KEY (warehouse_id) REFERENCES warehouses(id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS stock_moves (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                item_id INT NOT NULL,
+                warehouse_id INT NOT NULL,
+                move_type VARCHAR(20) NOT NULL,
+                qty DECIMAL(14,3) NOT NULL,
+                unit_cost DECIMAL(14,4) NOT NULL DEFAULT 0,
+                balance_after DECIMAL(14,3) NOT NULL,
+                ref_type VARCHAR(20) NOT NULL DEFAULT '',
+                ref_id INT NULL,
+                ref_number VARCHAR(40) NOT NULL DEFAULT '',
+                bin VARCHAR(60) NOT NULL DEFAULT '',
+                batch_no VARCHAR(60) NOT NULL DEFAULT '',
+                expiry_date DATE NULL,
+                fin1_id INT NULL, fin2_id INT NULL, fin3_id INT NULL, fin4_id INT NULL,
+                user_id INT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY ix_item (item_id, warehouse_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS assets (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                code VARCHAR(40) NOT NULL UNIQUE,
+                item_id INT NOT NULL,
+                category_id INT NOT NULL,
+                description VARCHAR(255) NOT NULL,
+                brand_model VARCHAR(190) NOT NULL DEFAULT '',
+                serial_no VARCHAR(120) NOT NULL DEFAULT '',
+                purchase_date DATE NULL,
+                purchase_value DECIMAL(14,2) NOT NULL DEFAULT 0,
+                currency CHAR(3) NOT NULL,
+                supplier_id INT NULL,
+                po_id INT NULL,
+                grn_line_id INT NULL,
+                fin1_id INT NULL, fin2_id INT NULL, fin3_id INT NULL, fin4_id INT NULL,
+                warehouse_id INT NULL,
+                location VARCHAR(190) NOT NULL DEFAULT '',
+                custodian VARCHAR(190) NOT NULL DEFAULT '',
+                cond ENUM('new','good','fair','poor','broken') NOT NULL DEFAULT 'new',
+                status ENUM('in_store','in_use','in_repair','disposed','lost') NOT NULL DEFAULT 'in_store',
+                notes TEXT,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY ix_serial (serial_no), KEY ix_cat (category_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         ],
     ];

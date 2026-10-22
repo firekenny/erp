@@ -23,6 +23,9 @@ render_header('Dashboard'); ?>
   <?php if (has_role('procurement') || has_role('admin')): ?>
   <a class="tile" href="rfq.php" style="text-decoration:none;color:inherit"><span class="muted">Approved, waiting for an RFQ</span><b><?= $pc['approved'] ?></b></a>
   <?php endif; ?>
+  <?php if (has_role('storekeeper')): $nRec = (int)q("SELECT COUNT(*) FROM po WHERE status IN ('issued','acknowledged','partially_received')")->fetchColumn(); ?>
+  <a class="tile" href="receive.php" style="text-decoration:none;color:inherit"><span class="muted">Orders waiting to be received</span><b><?= $nRec ?></b></a>
+  <?php endif; ?>
   <?php if (has_role('requester')): ?>
   <a class="tile" href="pr_edit.php" style="text-decoration:none;color:inherit;border-style:dashed"><span class="muted">Start a</span><b style="font-size:17px">+ New Purchase Request</b></a>
   <?php endif; ?>
@@ -53,6 +56,7 @@ render_header('Dashboard'); ?>
       ['Item categories created', $c['cats'] > 0, 'categories.php'],
       ['Item catalogue entered or imported', $c['items'] > 0, 'items.php'],
       ['Procurement methods by amount', (int)q('SELECT COUNT(*) FROM proc_methods WHERE active = 1')->fetchColumn() > 0, 'methods.php'],
+      ['Warehouses created', (int)q('SELECT COUNT(*) FROM warehouses WHERE active = 1')->fetchColumn() > 0, 'warehouses.php'],
       ['Suppliers entered or imported', (int)q("SELECT COUNT(*) FROM suppliers WHERE status = 'active'")->fetchColumn() > 0, 'suppliers.php'],
       ['Users invited', $c['users'] > 1, 'users.php'],
     ];

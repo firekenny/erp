@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 define('APP_ROOT', dirname(__DIR__));
-define('APP_VERSION', '0.4 (Purchase Requests, RFQs, award and Purchase Orders)');
+define('APP_VERSION', '0.5 (P2P + goods receiving)');
 
 session_set_cookie_params(['httponly' => true, 'samesite' => 'Lax', 'secure' => !empty($_SERVER['HTTPS'])]);
 session_name('erp_session');

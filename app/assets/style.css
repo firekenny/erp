@@ -60,6 +60,7 @@ details summary{cursor:pointer;font-weight:600}
 .demo-bar{background:#ffb703;color:#3d2c00;text-align:center;font-size:13px;font-weight:600;padding:5px 10px}
 .demo-bar a{color:#3d2c00}
 .tag.warn{background:var(--warn);color:var(--warn-ink)}
+.tag.service{background:#fdf2e3;color:#8a5a00}
 .print-only{display:none}
 @media print{
   .topbar,.side,.demo-bar,.noprint,.menu-btn{display:none!important}

@@ -59,6 +59,7 @@ const ROLES = [
     'requester'    => 'Requester',
     'budget_holder'=> 'Budget Holder',
     'procurement'  => 'Procurement Officer',
+    'storekeeper'  => 'Storekeeper',
 ];
 
 function current_user(): ?array {

@@ -5,9 +5,10 @@ $u = require_login();
 
 $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
 $po = po_get($id);
-$canSee = $po && (has_role('procurement') || has_role('admin') || (int)q('SELECT requester_id FROM pr WHERE id = ?', [$po['pr_id']])->fetchColumn() === (int)$u['id']);
+$canSee = $po && (has_role('procurement') || has_role('admin') || has_role('storekeeper') || (int)q('SELECT requester_id FROM pr WHERE id = ?', [$po['pr_id']])->fetchColumn() === (int)$u['id']);
 if (!$canSee) { flash('Purchase Order not found or not accessible.', 'err'); redirect('index.php'); }
 $isProc = has_role('procurement') || has_role('admin');
+require_once __DIR__ . '/inc/stock.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isProc) {
     $act = $_POST['act'] ?? '';
@@ -51,6 +52,11 @@ render_header($po['number']); ?>
 </div>
 <?php endif; ?>
 
+<?php $grns = q('SELECT g.id, g.number, g.received_date FROM grn g WHERE g.po_id = ? ORDER BY g.id', [$id])->fetchAll();
+if ($grns || ((has_role('storekeeper') || has_role('admin')) && in_array($po['status'], ['issued', 'acknowledged', 'partially_received'], true))): ?>
+<div class="flash noprint" style="background:#e8f0f8;color:#1f4e79">Receipts: <?php foreach ($grns as $g): ?><a href="grn_view.php?id=<?= (int)$g['id'] ?>"><b><?= e($g['number']) ?></b></a> (<?= e(date('d M', strtotime($g['received_date']))) ?>) <?php endforeach; ?><?= $grns ? '' : 'none yet' ?>
+  <?php if ((has_role('storekeeper') || has_role('admin')) && in_array($po['status'], ['issued', 'acknowledged', 'partially_received'], true)): ?> · <a class="btn small" href="receive.php?po=<?= $id ?>">Receive goods</a><?php endif; ?></div>
+<?php endif; ?>
 <?php require __DIR__ . '/inc/po_document.php'; ?>
 
 <?php if ($isProc): ?>

@@ -11,7 +11,8 @@ const DEMO_ACCOUNTS = [
     'admin'         => ['Alex Admin',        'admin',                    'Sets up finance codes, categories, items and users'],
     'requester'     => ['Rita Requester',    'requester',                'Raises Purchase Requests'],
     'budget_holder' => ['Ben Budget Holder', 'requester,budget_holder',  'Approves Purchase Requests for his cost centres'],
-    'procurement'   => ['Paula Procurement', 'procurement',              'Processes approved Purchase Requests'],
+    'procurement'   => ['Paula Procurement', 'procurement',              'Runs RFQs, awards and Purchase Orders'],
+    'storekeeper'   => ['Sam Storekeeper',   'storekeeper',              'Receives deliveries into stock and the asset register'],
 ];
 
 function is_demo(): bool { return defined('DEMO_MODE') && DEMO_MODE; }
@@ -124,6 +125,9 @@ function demo_seed(PDO $pdo): void {
     // Approval threshold: above 5,000 USD the Country Director (Alex) approves after the Budget Holder
     $ins('INSERT INTO approval_levels (name, min_amount, approver_user_id) VALUES (?, ?, ?)', ['Country Director', 5000, $uid['admin']]);
 
+    // Warehouses
+    $ins("INSERT INTO warehouses (code, name, address) VALUES ('NBO', 'Nairobi main warehouse', 'Industrial Area, Nairobi'), ('LOD', 'Lodwar field store', 'Lodwar, Turkana')", []);
+
     // Procurement methods and suppliers
     foreach ([['Single quotation', 1000, 1, 0], ['Request for quotations (RFQ)', 25000, 3, 1], ['Open tender', null, 3, 1]] as $m) {
         $ins('INSERT INTO proc_methods (name, max_amount, min_quotes, sealed) VALUES (?, ?, ?, ?)', $m);
@@ -224,4 +228,21 @@ function demo_seed(PDO $pdo): void {
         $rh('bid submitted', $sid);
     }
     $ins("INSERT INTO pr_history (pr_id, user_id, action, comment) VALUES (?, ?, 'sent to RFQ', ?)", [$pr2, $uid['procurement'], "RFQ-$year-0001"]);
+
+    // Sample Purchase Order, acknowledged by the supplier and ready to receive (radios = assets, USB drives = stock)
+    $mk('requester', 'Radios and USB drives for Lodwar field office', 'approved', 'ECHO', 'ECH-TUR',
+        [['TEL-0001', 'With spare battery and charger', 3, 420, '7020'], ['ITC-0002', '', 10, 14, '7020']],
+        ['budget_holder', 'approved', '', 'budget_holder'], 'Lodwar field store', 9);
+    $prR = (int)$pdo->query("SELECT MAX(id) FROM pr")->fetchColumn();
+    $pdo->prepare("UPDATE pr SET status = 'ordered' WHERE id = ?")->execute([$prR]);
+    $poId = $ins("INSERT INTO po (number, pr_id, supplier_id, currency, delivery_location, delivery_date, payment_terms, terms, status, token, created_by, created_at, acknowledged_at, acknowledged_name, email_status)
+                  VALUES (?, ?, ?, 'USD', 'Lodwar field store', ?, ?, ?, 'acknowledged', ?, ?, ?, ?, 'David Otieno, Sales', 'Demo: emails are never sent')",
+        ["PO-$year-0001", $prR, $sup('SUP-0002'), date('Y-m-d', strtotime('+2 days')), 'Payment within 30 days of receipt of goods and a valid invoice quoting this PO number.',
+         function_exists('default_po_terms') ? default_po_terms() : 'Standard terms and conditions apply.', bin2hex(random_bytes(24)), $uid['procurement'], date('Y-m-d H:i:s', strtotime('-6 days')), date('Y-m-d H:i:s', strtotime('-5 days'))]);
+    foreach ($pdo->query("SELECT l.*, i.description FROM pr_lines l JOIN items i ON i.id = l.item_id WHERE l.pr_id = $prR ORDER BY l.line_no")->fetchAll(PDO::FETCH_ASSOC) as $l) {
+        $ins('INSERT INTO po_lines (po_id, line_no, pr_line_id, item_id, description, specification, remarks, qty, unit, unit_price, fin1_id, fin2_id, fin3_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+             [$poId, $l['line_no'], $l['id'], $l['item_id'], $l['description'], $l['specification'], $l['line_no'] == 1 ? 'Motorola DP1400' : 'SanDisk Ultra', $l['qty'], $l['unit'], $l['unit_price'], $l['fin1_id'], $l['fin2_id'], $l['fin3_id']]);
+    }
+    $ins("INSERT INTO po_history (po_id, user_id, action, comment) VALUES (?, ?, 'issued', 'Single quotation')", [$poId, $uid['procurement']]);
+    $ins("INSERT INTO pr_history (pr_id, user_id, action, comment) VALUES (?, ?, 'ordered', ?)", [$prR, $uid['procurement'], "PO-$year-0001"]);
 }

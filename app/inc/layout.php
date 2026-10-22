@@ -19,6 +19,15 @@ function render_header(string $title): void {
             $nav[] = ['Purchase Orders', 'po.php'];
             $nav[] = ['Suppliers', 'suppliers.php'];
         }
+        if (has_role('storekeeper') || has_role('procurement') || has_role('admin')) {
+            $nav[] = ['Warehouse', null];
+            if (has_role('storekeeper') || has_role('admin')) {
+                $nRec = (int)q("SELECT COUNT(*) FROM po WHERE status IN ('issued','acknowledged','partially_received')")->fetchColumn();
+                $nav[] = ['Receiving' . ($nRec ? " ($nRec)" : ''), 'receive.php'];
+            }
+            $nav[] = ['Stock', 'stock.php'];
+            $nav[] = ['Asset register', 'assets.php'];
+        }
         if (has_role('admin')) {
             $nav[] = ['Setup', null];
             $nav[] = ['Organisation', 'settings.php'];
@@ -29,6 +38,7 @@ function render_header(string $title): void {
             $nav[] = ['Email settings', 'email_settings.php'];
             $nav[] = ['Item categories', 'categories.php'];
             $nav[] = ['Item catalogue', 'items.php'];
+            $nav[] = ['Warehouses', 'warehouses.php'];
         }
     }
     ?><!doctype html>
@@ -37,7 +47,7 @@ function render_header(string $title): void {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= e($title) ?> · <?= e($org) ?></title>
-<link rel="stylesheet" href="assets/style.css?v=5">
+<link rel="stylesheet" href="assets/style.css?v=6">
 </head>
 <body>
 <?php if (function_exists('is_demo') && is_demo()): ?>
@@ -51,7 +61,7 @@ function render_header(string $title): void {
 </header>
 <div class="shell">
 <nav class="side">
-<?php foreach ($nav as [$label, $href]): $isOn = $page === $href || ($href === 'pr.php' && str_starts_with($page, 'pr_')) || ($href === 'rfq.php' && str_starts_with($page, 'rfq')) || ($href === 'po.php' && str_starts_with($page, 'po_')); ?>
+<?php foreach ($nav as [$label, $href]): $isOn = $page === $href || ($href === 'pr.php' && str_starts_with($page, 'pr_')) || ($href === 'rfq.php' && str_starts_with($page, 'rfq')) || ($href === 'po.php' && str_starts_with($page, 'po_')) || ($href === 'receive.php' && $page === 'grn_view.php'); ?>
   <?php if ($href === null): ?><div class="nav-h"><?= e($label) ?></div>
   <?php else: ?><a href="<?= e($href) ?>" class="<?= $isOn ? 'on' : '' ?>"><?= e($label) ?></a><?php endif; ?>
 <?php endforeach; ?>
