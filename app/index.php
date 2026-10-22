@@ -26,7 +26,14 @@ render_header('Dashboard'); ?>
   <?php if (has_role('storekeeper')): $nRec = (int)q("SELECT COUNT(*) FROM po WHERE status IN ('issued','acknowledged','partially_received')")->fetchColumn(); ?>
   <a class="tile" href="receive.php" style="text-decoration:none;color:inherit"><span class="muted">Orders waiting to be received</span><b><?= $nRec ?></b></a>
   <?php endif; ?>
+  <?php if (has_role('storekeeper')): $nSr = (int)q("SELECT COUNT(*) FROM stock_requests WHERE status IN ('submitted','partially_issued')")->fetchColumn(); ?>
+  <a class="tile" href="requests.php" style="text-decoration:none;color:inherit"><span class="muted">Stock requests to issue</span><b><?= $nSr ?></b></a>
+  <?php endif; ?>
+  <?php if (has_role('admin')): $nCnt = (int)q("SELECT COUNT(*) FROM stock_counts WHERE status = 'submitted'")->fetchColumn(); if ($nCnt): ?>
+  <a class="tile" href="counts.php" style="text-decoration:none;color:inherit"><span class="muted">Stock counts to approve</span><b><?= $nCnt ?></b></a>
+  <?php endif; endif; ?>
   <?php if (has_role('requester')): ?>
+  <a class="tile" href="requests.php?new=1" style="text-decoration:none;color:inherit;border-style:dashed"><span class="muted">Need items from the warehouse?</span><b style="font-size:17px">+ Stock request</b></a>
   <a class="tile" href="pr_edit.php" style="text-decoration:none;color:inherit;border-style:dashed"><span class="muted">Start a</span><b style="font-size:17px">+ New Purchase Request</b></a>
   <?php endif; ?>
 </div>

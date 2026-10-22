@@ -128,6 +128,30 @@ function demo_seed(PDO $pdo): void {
     // Warehouses
     $ins("INSERT INTO warehouses (code, name, address) VALUES ('NBO', 'Nairobi main warehouse', 'Industrial Area, Nairobi'), ('LOD', 'Lodwar field store', 'Lodwar, Turkana')", []);
 
+    // Opening stock in lots (each with its donor coding) so stock requests, transfers, counts and traceability can be tried
+    $whId = fn(string $c) => (int)$pdo->query('SELECT id FROM warehouses WHERE code = ' . $pdo->quote($c))->fetchColumn();
+    $finId = fn(string $c) => (int)$pdo->query('SELECT id FROM fin_values WHERE code = ' . $pdo->quote($c))->fetchColumn();
+    foreach ([
+        ['CLN-0003', 'LOD', 200, 18.5, 'ECHO', 'ECH-TUR', '5030', null, ''],
+        ['CLN-0001', 'LOD', 1000, 0.40, 'ECHO', 'ECH-TUR', '5030', null, ''],
+        ['CAMP-0004', 'LOD', 400, 4.20, 'ECHO', 'ECH-MAR', '5030', null, ''],
+        ['CAMP-0003', 'LOD', 300, 6.00, 'FCDO', 'FCD-GAR', '5010', null, ''],
+        ['MEDC-0002', 'NBO', 3000, 0.08, 'FCDO', 'FCD-GAR', '5020', date('Y-m-d', strtotime('+60 days')), 'ORS-2401'],
+        ['MEDC-0002', 'NBO', 5000, 0.09, 'ECHO', 'ECH-TUR', '5020', date('Y-m-d', strtotime('+400 days')), 'ORS-2510'],
+        ['STAT-0001', 'NBO', 60, 4.80, 'UNR', 'UNR-SUP', '7010', null, ''],
+        ['MEDC-0001', 'NBO', 25, 35.0, 'FCDO', 'FCD-GAR', '5020', date('Y-m-d', strtotime('+300 days')), 'FAK-77'],
+    ] as [$ic, $wc, $q, $cost, $d, $cc, $bl, $exp, $batch]) {
+        $iid = (int)$pdo->query('SELECT id FROM items WHERE code = ' . $pdo->quote($ic))->fetchColumn(); $wid = $whId($wc);
+        $when = date('Y-m-d H:i:s', strtotime('-20 days'));
+        $lot = $ins("INSERT INTO stock_lots (item_id, warehouse_id, source_type, source_ref, received_date, qty_in, qty_left, unit_cost, fin1_id, fin2_id, fin3_id, batch_no, expiry_date, created_at)
+                     VALUES (?, ?, 'opening', 'Opening stock', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [$iid, $wid, date('Y-m-d', strtotime('-20 days')), $q, $q, $cost, $finId($d), $finId($cc), $finId($bl), $batch, $exp, $when]);
+        $cur = $pdo->query("SELECT qty, avg_cost FROM stock WHERE item_id = $iid AND warehouse_id = $wid")->fetch(PDO::FETCH_ASSOC);
+        $nq = ($cur ? (float)$cur['qty'] : 0) + $q; $nc = (($cur ? (float)$cur['qty'] * (float)$cur['avg_cost'] : 0) + $q * $cost) / $nq;
+        $pdo->prepare('INSERT INTO stock (item_id, warehouse_id, qty, avg_cost) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE qty = VALUES(qty), avg_cost = VALUES(avg_cost)')->execute([$iid, $wid, $nq, $nc]);
+        $ins("INSERT INTO stock_moves (item_id, warehouse_id, move_type, qty, unit_cost, balance_after, ref_type, ref_number, batch_no, expiry_date, fin1_id, fin2_id, fin3_id, lot_id, created_at)
+              VALUES (?, ?, 'receipt', ?, ?, ?, 'opening', 'Opening stock', ?, ?, ?, ?, ?, ?, ?)", [$iid, $wid, $q, $cost, $nq, $batch, $exp, $finId($d), $finId($cc), $finId($bl), $lot, $when]);
+    }
+
     // Procurement methods and suppliers
     foreach ([['Single quotation', 1000, 1, 0], ['Request for quotations (RFQ)', 25000, 3, 1], ['Open tender', null, 3, 1]] as $m) {
         $ins('INSERT INTO proc_methods (name, max_amount, min_quotes, sealed) VALUES (?, ?, ?, ?)', $m);
@@ -244,5 +268,12 @@ function demo_seed(PDO $pdo): void {
              [$poId, $l['line_no'], $l['id'], $l['item_id'], $l['description'], $l['specification'], $l['line_no'] == 1 ? 'Motorola DP1400' : 'SanDisk Ultra', $l['qty'], $l['unit'], $l['unit_price'], $l['fin1_id'], $l['fin2_id'], $l['fin3_id']]);
     }
     $ins("INSERT INTO po_history (po_id, user_id, action, comment) VALUES (?, ?, 'issued', 'Single quotation')", [$poId, $uid['procurement']]);
+
+    // A stock request waiting for the storekeeper
+    $srId = $ins("INSERT INTO stock_requests (number, requester_id, warehouse_id, issue_to, destination, purpose, needed_by, created_at) VALUES (?, ?, ?, 'Rita Requester', 'Kakuma distribution point', 'Monthly hygiene distribution, 50 households', ?, ?)",
+        ["SR-$year-0001", $uid['requester'], $whId('LOD'), date('Y-m-d', strtotime('+3 days')), date('Y-m-d H:i:s', strtotime('-1 day'))]);
+    foreach ([['CLN-0003', 50], ['CLN-0001', 200], ['CAMP-0004', 50]] as [$ic, $q]) {
+        $ins('INSERT INTO stock_request_lines (request_id, item_id, qty_requested) VALUES (?, (SELECT id FROM items WHERE code = ?), ?)', [$srId, $ic, $q]);
+    }
     $ins("INSERT INTO pr_history (pr_id, user_id, action, comment) VALUES (?, ?, 'ordered', ?)", [$prR, $uid['procurement'], "PO-$year-0001"]);
 }

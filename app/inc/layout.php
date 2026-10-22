@@ -12,6 +12,7 @@ function render_header(string $title): void {
         $prLabel = 'Purchase Requests';
         if (function_exists('pr_counts')) { $c = pr_counts($u); $n = $c['to_approve'] + $c['self_blocked'] + $c['returned'] + (function_exists('award_pending_count') ? award_pending_count($u) : 0); if ($n) $prLabel .= " ($n)"; }
         $nav[] = [$prLabel, 'pr.php'];
+        if (has_role('requester') && !has_role('storekeeper')) $nav[] = ['Stock requests', 'requests.php'];
         if (has_role('procurement') || has_role('admin')) {
             $nav[] = ['Procurement', null];
             $nWait = (int)q("SELECT COUNT(*) FROM pr WHERE status = 'approved'")->fetchColumn();
@@ -25,8 +26,18 @@ function render_header(string $title): void {
                 $nRec = (int)q("SELECT COUNT(*) FROM po WHERE status IN ('issued','acknowledged','partially_received')")->fetchColumn();
                 $nav[] = ['Receiving' . ($nRec ? " ($nRec)" : ''), 'receive.php'];
             }
+            if (has_role('storekeeper') || has_role('admin')) {
+                $nSr = (int)q("SELECT COUNT(*) FROM stock_requests WHERE status IN ('submitted','partially_issued')")->fetchColumn();
+                $nav[] = ['Stock requests' . ($nSr ? " ($nSr)" : ''), 'requests.php'];
+            }
             $nav[] = ['Stock', 'stock.php'];
+            $nav[] = ['Issues & transfers', 'issues.php'];
+            if (has_role('storekeeper') || has_role('admin')) {
+                $nCnt = has_role('admin') ? (int)q("SELECT COUNT(*) FROM stock_counts WHERE status = 'submitted'")->fetchColumn() : 0;
+                $nav[] = ['Stock counts' . ($nCnt ? " ($nCnt)" : ''), 'counts.php'];
+            }
             $nav[] = ['Asset register', 'assets.php'];
+            $nav[] = ['Donor traceability', 'trace.php'];
         }
         if (has_role('admin')) {
             $nav[] = ['Setup', null];
@@ -61,7 +72,7 @@ function render_header(string $title): void {
 </header>
 <div class="shell">
 <nav class="side">
-<?php foreach ($nav as [$label, $href]): $isOn = $page === $href || ($href === 'pr.php' && str_starts_with($page, 'pr_')) || ($href === 'rfq.php' && str_starts_with($page, 'rfq')) || ($href === 'po.php' && str_starts_with($page, 'po_')) || ($href === 'receive.php' && $page === 'grn_view.php'); ?>
+<?php foreach ($nav as [$label, $href]): $isOn = $page === $href || ($href === 'pr.php' && str_starts_with($page, 'pr_')) || ($href === 'rfq.php' && str_starts_with($page, 'rfq')) || ($href === 'po.php' && str_starts_with($page, 'po_')) || ($href === 'receive.php' && $page === 'grn_view.php') || ($href === 'requests.php' && $page === 'request_view.php') || ($href === 'issues.php' && $page === 'issue_view.php'); ?>
   <?php if ($href === null): ?><div class="nav-h"><?= e($label) ?></div>
   <?php else: ?><a href="<?= e($href) ?>" class="<?= $isOn ? 'on' : '' ?>"><?= e($label) ?></a><?php endif; ?>
 <?php endforeach; ?>

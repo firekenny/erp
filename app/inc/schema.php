@@ -6,7 +6,7 @@ declare(strict_types=1);
  * After each deploy, the app upgrades the database by itself on the next page load —
  * no manual SQL needed.
  */
-const SCHEMA_VERSION = 8;
+const SCHEMA_VERSION = 9;
 
 function schema_migrations(): array {
     return [
@@ -470,6 +470,103 @@ function schema_migrations(): array {
                 notes TEXT,
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 KEY ix_serial (serial_no), KEY ix_cat (category_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        ],
+        9 => [
+            // Lots: each receipt keeps its donor coding, so every issue stays traceable
+            "CREATE TABLE IF NOT EXISTS stock_lots (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                item_id INT NOT NULL,
+                warehouse_id INT NOT NULL,
+                source_type VARCHAR(20) NOT NULL,
+                source_ref VARCHAR(40) NOT NULL DEFAULT '',
+                parent_lot_id INT NULL,
+                received_date DATE NOT NULL,
+                qty_in DECIMAL(14,3) NOT NULL,
+                qty_left DECIMAL(14,3) NOT NULL,
+                unit_cost DECIMAL(14,4) NOT NULL DEFAULT 0,
+                fin1_id INT NULL, fin2_id INT NULL, fin3_id INT NULL, fin4_id INT NULL,
+                batch_no VARCHAR(60) NOT NULL DEFAULT '',
+                expiry_date DATE NULL,
+                bin VARCHAR(60) NOT NULL DEFAULT '',
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY ix_avail (item_id, warehouse_id, qty_left)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "INSERT INTO stock_lots (item_id, warehouse_id, source_type, source_ref, received_date, qty_in, qty_left, unit_cost, fin1_id, fin2_id, fin3_id, fin4_id, batch_no, expiry_date, bin, created_at)
+             SELECT item_id, warehouse_id, 'grn', ref_number, DATE(created_at), qty, qty, unit_cost, fin1_id, fin2_id, fin3_id, fin4_id, batch_no, expiry_date, bin, created_at
+             FROM stock_moves WHERE move_type = 'receipt' AND qty > 0",
+            "ALTER TABLE stock_moves ADD COLUMN lot_id INT NULL, ADD COLUMN issued_to VARCHAR(190) NOT NULL DEFAULT '', ADD COLUMN destination VARCHAR(190) NOT NULL DEFAULT ''",
+            "CREATE TABLE IF NOT EXISTS stock_requests (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                number VARCHAR(40) NOT NULL UNIQUE,
+                requester_id INT NOT NULL,
+                warehouse_id INT NOT NULL,
+                issue_to VARCHAR(190) NOT NULL,
+                destination VARCHAR(190) NOT NULL DEFAULT '',
+                purpose VARCHAR(500) NOT NULL DEFAULT '',
+                needed_by DATE NULL,
+                status ENUM('submitted','partially_issued','issued','cancelled','rejected') NOT NULL DEFAULT 'submitted',
+                storekeeper_note VARCHAR(500) NOT NULL DEFAULT '',
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY ix_status (status)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS stock_request_lines (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                request_id INT NOT NULL,
+                item_id INT NOT NULL,
+                qty_requested DECIMAL(14,3) NOT NULL,
+                qty_issued DECIMAL(14,3) NOT NULL DEFAULT 0,
+                KEY ix_req (request_id),
+                CONSTRAINT fk_srl_req FOREIGN KEY (request_id) REFERENCES stock_requests(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS issues (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                number VARCHAR(40) NOT NULL UNIQUE,
+                type ENUM('issue','transfer') NOT NULL DEFAULT 'issue',
+                request_id INT NULL,
+                warehouse_id INT NOT NULL,
+                to_warehouse_id INT NULL,
+                issued_to VARCHAR(190) NOT NULL DEFAULT '',
+                destination VARCHAR(190) NOT NULL DEFAULT '',
+                vehicle VARCHAR(120) NOT NULL DEFAULT '',
+                notes TEXT,
+                issued_by INT NOT NULL,
+                issued_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY ix_req (request_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS issue_lines (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                issue_id INT NOT NULL,
+                item_id INT NOT NULL,
+                lot_id INT NOT NULL,
+                qty DECIMAL(14,3) NOT NULL,
+                unit_cost DECIMAL(14,4) NOT NULL DEFAULT 0,
+                KEY ix_issue (issue_id), KEY ix_lot (lot_id),
+                CONSTRAINT fk_il_issue FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS stock_counts (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                number VARCHAR(40) NOT NULL UNIQUE,
+                warehouse_id INT NOT NULL,
+                status ENUM('open','submitted','approved','rejected') NOT NULL DEFAULT 'open',
+                notes TEXT,
+                created_by INT NOT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                submitted_by INT NULL,
+                submitted_at DATETIME NULL,
+                decided_by INT NULL,
+                decided_at DATETIME NULL,
+                decision_note VARCHAR(500) NOT NULL DEFAULT ''
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS stock_count_lines (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                count_id INT NOT NULL,
+                item_id INT NOT NULL,
+                counted_qty DECIMAL(14,3) NULL,
+                system_qty DECIMAL(14,3) NULL,
+                note VARCHAR(255) NOT NULL DEFAULT '',
+                UNIQUE KEY uq_cl (count_id, item_id),
+                CONSTRAINT fk_scl_c FOREIGN KEY (count_id) REFERENCES stock_counts(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         ],
     ];

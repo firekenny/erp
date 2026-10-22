@@ -27,7 +27,7 @@ if ($item) {
       <?php if (!$moves): ?><tr><td colspan="11" class="muted">No movements yet.</td></tr><?php endif; ?>
       <?php foreach ($moves as $m): ?>
       <tr><td style="white-space:nowrap"><?= e(date('d M Y H:i', strtotime($m['created_at']))) ?></td><td><?= e($m['wh']) ?></td><td><?= e(ucfirst($m['move_type'])) ?></td>
-        <td><?= $m['ref_type'] === 'grn' ? '<a href="grn_view.php?id=' . (int)$m['ref_id'] . '">' . e($m['ref_number']) . '</a>' : e($m['ref_number']) ?></td>
+        <td><?= $m['ref_type'] === 'grn' ? '<a href="grn_view.php?id=' . (int)$m['ref_id'] . '">' . e($m['ref_number']) . '</a>' : ($m['ref_type'] === 'issue' ? '<a href="issue_view.php?id=' . (int)$m['ref_id'] . '">' . e($m['ref_number']) . '</a>' : ($m['ref_type'] === 'count' ? '<a href="counts.php?id=' . (int)$m['ref_id'] . '">' . e($m['ref_number']) . '</a>' : e($m['ref_number']))) ?><?= $m['issued_to'] || $m['destination'] ? '<br><span class="muted">→ ' . e(trim($m['issued_to'] . ' ' . $m['destination'])) . '</span>' : '' ?></td>
         <td style="text-align:right"><?= (float)$m['qty'] > 0 ? $fmtQty($m['qty']) : '' ?></td><td style="text-align:right"><?= (float)$m['qty'] < 0 ? $fmtQty(-$m['qty']) : '' ?></td>
         <td style="text-align:right"><b><?= $fmtQty($m['balance_after']) ?></b></td><td style="text-align:right"><?= number_format((float)$m['unit_cost'], 2) ?></td>
         <td class="muted"><?= e(implode(' / ', array_filter([$codes[(int)$m['fin1_id']] ?? '', $codes[(int)$m['fin2_id']] ?? '', $codes[(int)$m['fin3_id']] ?? '']))) ?></td>
@@ -62,5 +62,5 @@ render_header('Stock'); ?>
   <?php endforeach; ?>
   <?php if ($rows): ?><tr><td colspan="4" style="text-align:right"><b>Total stock value</b></td><td style="text-align:right"><b><?= number_format($total, 2) ?></b></td><td></td></tr><?php endif; ?>
 </table></div>
-<p class="muted">Click an item to see its stock card (every movement, with the donor coding it was bought on). Issues, transfers and counts come in the next build step.</p>
+<p class="muted">Click an item to see its stock card: every movement, the donor coding it was bought on, and who it was issued to.</p>
 <?php render_footer();

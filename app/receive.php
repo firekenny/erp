@@ -57,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $poId) {
         if ($accQ <= 0) continue;
         if ($t['type'] === 'stock') {
             stock_in((int)$l['item_id'], $wh, $accQ, (float)$l['unit_price'],
-                     ['type' => 'receipt', 'ref_type' => 'grn', 'ref_id' => $grnId, 'ref_number' => $number, 'bin' => $t['bin'], 'batch_no' => $t['batch'], 'expiry_date' => $t['expiry']], $fin);
+                     ['type' => 'receipt', 'source_type' => 'grn', 'ref_type' => 'grn', 'ref_id' => $grnId, 'ref_number' => $number, 'date' => $date, 'bin' => $t['bin'], 'batch_no' => $t['batch'], 'expiry_date' => $t['expiry']], $fin);
             $nStock++;
         } elseif ($t['type'] === 'asset') {
             $whName = q('SELECT name FROM warehouses WHERE id = ?', [$wh])->fetchColumn();
