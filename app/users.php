@@ -14,6 +14,10 @@ function new_invite(int $id): string {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $act = $_POST['act'] ?? '';
     $id  = (int)($_POST['id'] ?? 0);
+    if (is_demo() && $id && in_array($act, ['roles', 'toggle', 'link'], true)) {
+        $t = q('SELECT email FROM users WHERE id = ?', [$id])->fetch();
+        if ($t && is_demo_account($t)) { flash('The four demo accounts cannot be changed. Add your own test user instead.', 'warn'); redirect('users.php'); }
+    }
 
     if ($act === 'invite') {
         $name  = trim((string)($_POST['name'] ?? ''));

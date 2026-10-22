@@ -16,6 +16,7 @@ require APP_ROOT . '/config.php';
 require __DIR__ . '/functions.php';
 require __DIR__ . '/layout.php';
 require __DIR__ . '/schema.php';
+require __DIR__ . '/demo.php';
 
 // Upgrade the database automatically after a new version is deployed
 if ((int)(q("SELECT v FROM settings WHERE k = 'db_version'")->fetchColumn() ?: 0) < SCHEMA_VERSION) {
@@ -23,4 +24,7 @@ if ((int)(q("SELECT v FROM settings WHERE k = 'db_version'")->fetchColumn() ?: 0
 }
 
 date_default_timezone_set(defined('APP_TZ') ? APP_TZ : 'UTC');
+
+// Public demo: fresh sample data every night
+if (is_demo()) demo_reset_if_due();
 csrf_check();

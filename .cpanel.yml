@@ -1,6 +1,11 @@
 ---
 deployment:
   tasks:
+    # Main ERP
     - export DEPLOYPATH=/home/c1380736c/public_html/erp/
     - /bin/mkdir -p $DEPLOYPATH
     - /bin/cp -R app/. $DEPLOYPATH
+    # Public demo (same code; demo mode is set in its own config.php)
+    - export DEMOPATH=/home/c1380736c/public_html/demo-erp/
+    - /bin/mkdir -p $DEMOPATH
+    - /bin/cp -R app/. $DEMOPATH

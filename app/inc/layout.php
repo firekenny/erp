@@ -25,9 +25,12 @@ function render_header(string $title): void {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= e($title) ?> · <?= e($org) ?></title>
-<link rel="stylesheet" href="assets/style.css?v=1">
+<link rel="stylesheet" href="assets/style.css?v=2">
 </head>
 <body>
+<?php if (function_exists('is_demo') && is_demo()): ?>
+<div class="demo-bar">Demo version · sample data, reset every night<?php if ($u): ?> · <a href="logout.php">Switch role</a><?php endif; ?></div>
+<?php endif; ?>
 <?php if ($u): ?>
 <header class="topbar">
   <button class="menu-btn" onclick="document.body.classList.toggle('nav-open')" aria-label="Menu">☰</button>
