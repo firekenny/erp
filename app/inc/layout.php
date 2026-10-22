@@ -36,8 +36,12 @@ function render_header(string $title): void {
                 $nCnt = has_role('admin') ? (int)q("SELECT COUNT(*) FROM stock_counts WHERE status = 'submitted'")->fetchColumn() : 0;
                 $nav[] = ['Stock counts' . ($nCnt ? " ($nCnt)" : ''), 'counts.php'];
             }
-            $nav[] = ['Asset register', 'assets.php'];
             $nav[] = ['Donor traceability', 'trace.php'];
+            $nav[] = ['Assets', null];
+            $nav[] = ['Asset register', 'assets.php'];
+            $nUns = (int)q("SELECT COUNT(*) FROM handovers WHERE type = 'handover' AND signed_at IS NULL")->fetchColumn();
+            $nav[] = ['Handovers' . ($nUns ? " ($nUns)" : ''), 'handovers.php'];
+            if (has_role('storekeeper') || has_role('admin')) { $nav[] = ['Staff', 'employees.php']; $nav[] = ['Asset locations', 'locations.php']; }
         }
         if (has_role('admin')) {
             $nav[] = ['Setup', null];
@@ -58,7 +62,7 @@ function render_header(string $title): void {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= e($title) ?> · <?= e($org) ?></title>
-<link rel="stylesheet" href="assets/style.css?v=6">
+<link rel="stylesheet" href="assets/style.css?v=7">
 </head>
 <body>
 <?php if (function_exists('is_demo') && is_demo()): ?>
@@ -72,7 +76,7 @@ function render_header(string $title): void {
 </header>
 <div class="shell">
 <nav class="side">
-<?php foreach ($nav as [$label, $href]): $isOn = $page === $href || ($href === 'pr.php' && str_starts_with($page, 'pr_')) || ($href === 'rfq.php' && str_starts_with($page, 'rfq')) || ($href === 'po.php' && str_starts_with($page, 'po_')) || ($href === 'receive.php' && $page === 'grn_view.php') || ($href === 'requests.php' && $page === 'request_view.php') || ($href === 'issues.php' && $page === 'issue_view.php'); ?>
+<?php foreach ($nav as [$label, $href]): $isOn = $page === $href || ($href === 'pr.php' && str_starts_with($page, 'pr_')) || ($href === 'rfq.php' && str_starts_with($page, 'rfq')) || ($href === 'po.php' && str_starts_with($page, 'po_')) || ($href === 'receive.php' && $page === 'grn_view.php') || ($href === 'requests.php' && $page === 'request_view.php') || ($href === 'issues.php' && $page === 'issue_view.php') || ($href === 'assets.php' && in_array($page, ['asset_view.php', 'assets_import.php'], true)) || ($href === 'handovers.php' && in_array($page, ['handover.php', 'handover_view.php'], true)); ?>
   <?php if ($href === null): ?><div class="nav-h"><?= e($label) ?></div>
   <?php else: ?><a href="<?= e($href) ?>" class="<?= $isOn ? 'on' : '' ?>"><?= e($label) ?></a><?php endif; ?>
 <?php endforeach; ?>

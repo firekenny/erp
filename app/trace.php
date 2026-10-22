@@ -82,6 +82,6 @@ render_header('Donor traceability'); ?>
     <?php foreach ($moves as $m): ?><tr><td style="white-space:nowrap"><?= e(date('d M Y H:i', strtotime($m['created_at']))) ?></td><td><?= e($m['move_type']) ?></td><td><?= e($m['ref_number']) ?></td>
       <td><?= e($m['item_code']) ?></td><td style="text-align:right"><?= ((float)$m['qty'] > 0 ? '+' : '') . $fmtQty($m['qty']) ?></td><td><?= e($m['wh']) ?></td><td><?= e(trim($m['issued_to'] . ' ' . $m['destination'])) ?></td></tr><?php endforeach; ?>
   </table></div></details>
-<p class="muted">Assets bought on this code are listed in the asset register (filter by the same code is coming with the asset module).</p>
+<p class="muted"><a href="assets.php?st=&fin=<?= $fv ?>">See the assets bought on this code</a> in the asset register.</p>
 <?php endif;
 render_footer();

@@ -6,7 +6,7 @@ declare(strict_types=1);
  * After each deploy, the app upgrades the database by itself on the next page load —
  * no manual SQL needed.
  */
-const SCHEMA_VERSION = 9;
+const SCHEMA_VERSION = 10;
 
 function schema_migrations(): array {
     return [
@@ -568,6 +568,72 @@ function schema_migrations(): array {
                 UNIQUE KEY uq_cl (count_id, item_id),
                 CONSTRAINT fk_scl_c FOREIGN KEY (count_id) REFERENCES stock_counts(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        ],
+        10 => [
+            "CREATE TABLE IF NOT EXISTS employees (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(160) NOT NULL,
+                position VARCHAR(120) NOT NULL DEFAULT '',
+                department VARCHAR(120) NOT NULL DEFAULT '',
+                email VARCHAR(190) NOT NULL DEFAULT '',
+                phone VARCHAR(60) NOT NULL DEFAULT '',
+                staff_no VARCHAR(40) NOT NULL DEFAULT '',
+                active TINYINT(1) NOT NULL DEFAULT 1,
+                KEY ix_name (name)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS locations (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(160) NOT NULL UNIQUE,
+                address VARCHAR(255) NOT NULL DEFAULT '',
+                active TINYINT(1) NOT NULL DEFAULT 1
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "INSERT IGNORE INTO locations (name, address) SELECT name, address FROM warehouses",
+            "ALTER TABLE assets MODIFY item_id INT NULL,
+                ADD COLUMN location_id INT NULL,
+                ADD COLUMN employee_id INT NULL,
+                ADD COLUMN disposed_at DATE NULL,
+                ADD COLUMN disposal_method VARCHAR(60) NOT NULL DEFAULT '',
+                ADD COLUMN disposal_value DECIMAL(14,2) NULL,
+                ADD COLUMN disposal_note VARCHAR(500) NOT NULL DEFAULT ''",
+            "UPDATE assets a JOIN warehouses w ON w.id = a.warehouse_id JOIN locations l ON l.name = w.name SET a.location_id = l.id",
+            "CREATE TABLE IF NOT EXISTS handovers (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                number VARCHAR(40) NOT NULL UNIQUE,
+                type ENUM('handover','return','move') NOT NULL,
+                employee_id INT NULL,
+                location_id INT NULL,
+                notes TEXT,
+                created_by INT NOT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                token CHAR(48) NOT NULL UNIQUE,
+                email_status VARCHAR(255) NULL,
+                sign_method VARCHAR(10) NULL,
+                signed_at DATETIME NULL,
+                signed_name VARCHAR(160) NULL,
+                signature MEDIUMTEXT NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS handover_lines (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                handover_id INT NOT NULL,
+                asset_id INT NOT NULL,
+                from_text VARCHAR(255) NOT NULL DEFAULT '',
+                cond VARCHAR(10) NOT NULL DEFAULT '',
+                KEY ix_h (handover_id), KEY ix_a (asset_id),
+                CONSTRAINT fk_hl_h FOREIGN KEY (handover_id) REFERENCES handovers(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS asset_events (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                asset_id INT NOT NULL,
+                event VARCHAR(40) NOT NULL,
+                details VARCHAR(500) NOT NULL DEFAULT '',
+                ref_type VARCHAR(20) NOT NULL DEFAULT '',
+                ref_id INT NULL,
+                user_id INT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY ix_asset (asset_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "INSERT INTO asset_events (asset_id, event, details, ref_type, ref_id, created_at)
+             SELECT a.id, 'received', CONCAT('Received on ', g.number), 'grn', g.id, a.created_at FROM assets a JOIN grn_lines gl ON gl.id = a.grn_line_id JOIN grn g ON g.id = gl.grn_id",
         ],
     ];
 }

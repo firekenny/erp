@@ -11,7 +11,7 @@ $rfq = $rs ? rfq_get((int)$rs['rfq_id']) : null;
 
 function bid_page_start(string $title): void { ?><!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">
-<title><?= e($title) ?></title><link rel="stylesheet" href="assets/style.css?v=6"></head><body>
+<title><?= e($title) ?></title><link rel="stylesheet" href="assets/style.css?v=7"></head><body>
 <?php if (is_demo()): ?><div class="demo-bar">Demo version · this is the page a supplier sees when opening their personal link</div><?php endif; ?>
 <header class="topbar"><span class="brand"><?= e(setting('org_name')) ?></span><span class="who">Supplier quotation</span></header>
 <main style="max-width:980px;margin:0 auto"><?php foreach (flash() ?? [] as $f): ?><div class="flash <?= e($f['type']) ?>"><?= e($f['msg']) ?></div><?php endforeach;

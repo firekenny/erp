@@ -269,6 +269,45 @@ function demo_seed(PDO $pdo): void {
     }
     $ins("INSERT INTO po_history (po_id, user_id, action, comment) VALUES (?, ?, 'issued', 'Single quotation')", [$poId, $uid['procurement']]);
 
+    // Staff, locations and assets in use (with handovers)
+    foreach ([['Grace Wanjiru', 'Programme Manager', 'Programmes', 'grace.w@horizon.example'], ['David Kiprono', 'Logistics Officer', 'Support', 'david.k@horizon.example'],
+              ['Amina Hassan', 'WASH Engineer', 'Programmes', 'amina.h@horizon.example'], ['Peter Ekai', 'Driver', 'Support', ''],
+              ['Joyce Akinyi', 'Finance Officer', 'Finance', 'joyce.a@horizon.example'], ['Samuel Lokol', 'Field Coordinator', 'Programmes', 'samuel.l@horizon.example']] as $k => [$n, $pos, $dep, $em]) {
+        $ins('INSERT INTO employees (name, position, department, email, staff_no) VALUES (?, ?, ?, ?, ?)', [$n, $pos, $dep, $em, 'HRK-' . str_pad((string)($k + 1), 3, '0', STR_PAD_LEFT)]);
+    }
+    $pdo->exec("INSERT INTO locations (name, address) SELECT name, address FROM warehouses");
+    foreach (['Nairobi office', 'Lodwar field office', 'Kakuma distribution point', 'Marsabit field office'] as $ln) $ins('INSERT INTO locations (name) VALUES (?)', [$ln]);
+    $locId = fn(string $n) => (int)$pdo->query('SELECT id FROM locations WHERE name = ' . $pdo->quote($n))->fetchColumn();
+    $empId = fn(string $n) => (int)$pdo->query('SELECT id FROM employees WHERE name = ' . $pdo->quote($n))->fetchColumn();
+    $catOf = fn(string $c) => (int)$pdo->query('SELECT id FROM categories WHERE code = ' . $pdo->quote($c))->fetchColumn();
+    $aIds = [];
+    foreach ([
+        ['AS-IT-0001', 'IT', 'Laptop 14", i5, 16GB RAM', 'Dell Latitude 3440', 'DL3440-88412', '-14 months', 905, 'FCDO', 'FCD-NBI', '7020', 'Nairobi office', 'Grace Wanjiru', 'good', 'in_use'],
+        ['AS-IT-0002', 'IT', 'Laptop 14", i5, 16GB RAM', 'Dell Latitude 3440', 'DL3440-88419', '-14 months', 905, 'FCDO', 'FCD-NBI', '7020', 'Nairobi office', 'Joyce Akinyi', 'good', 'in_use'],
+        ['AS-IT-0003', 'IT', 'Laser printer A4 multifunction', 'HP LaserJet M428', 'PHBX12093', '-30 months', 420, 'UNR', 'UNR-SUP', '7020', 'Nairobi office', '', 'fair', 'in_store'],
+        ['AS-VEH-0001', 'VEH', '4x4 station wagon, diesel', 'Toyota Land Cruiser 76, KDA 123X', 'JTEBH9FJ10K112233', '-3 years', 58000, 'ECHO', 'ECH-TUR', '6030', 'Lodwar field office', 'Peter Ekai', 'good', 'in_use'],
+        ['AS-GEN-0001', 'GEN', 'Diesel generator 10 kVA', 'Perkins 10kVA silent', 'PK10-55821', '-2 years', 6400, 'ECHO', 'ECH-MAR', '7030', 'Marsabit field office', '', 'good', 'in_use'],
+        ['AS-TEL-0101', 'TEL', 'Satellite phone', 'Thuraya XT-Lite', '', '-8 months', 690, 'ECHO', 'ECH-TUR', '7020', 'Lodwar field office', 'Samuel Lokol', 'new', 'in_use'],
+        ['AS-FURN-0001', 'FURN', 'Office desk 140 cm', '', '', '-4 years', 180, 'UNR', 'UNR-SUP', '7030', 'Nairobi office', '', 'poor', 'in_repair'],
+    ] as [$code, $cc, $desc, $bm, $sn, $age, $val, $d, $c, $bl, $loc, $emp, $cond, $st]) {
+        $aid = $ins("INSERT INTO assets (code, category_id, description, brand_model, serial_no, purchase_date, purchase_value, currency, fin1_id, fin2_id, fin3_id, location_id, location, employee_id, cond, status)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, 'USD', ?, ?, ?, ?, ?, ?, ?, ?)",
+            [$code, $catOf($cc), $desc, $bm, $sn, date('Y-m-d', strtotime($age)), $val, $finId($d), $finId($c), $finId($bl), $locId($loc), $loc, $emp ? $empId($emp) : null, $cond, $st]);
+        $ins("INSERT INTO asset_events (asset_id, event, details, created_at) VALUES (?, 'imported', 'From existing register', ?)", [$aid, date('Y-m-d H:i:s', strtotime($age))]);
+        $aIds[$code] = $aid;
+    }
+    $sigPng = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAABaCAYAAAACcWsdAAAET0lEQVR42u3dTVLjMBBA4SHFOVhzAO5/Ag7AmotkFlNUARPbktWS9fO9qtlAJjjd1lO3LDtP9/v9DwCMwE0IABAWABAWAMICAMICAMICQFgAQFgAQFgACAsACAsACAsAYQEAYQEAYQEgLAAgLAAgLACEBQCEBQCEBYCwAICwAICwABAWABAWABAWAMICAMICQFgAQFgAQFgACAsA+uZ55IN/eX27P/r558f7k9QC8/F0v9+nkhVplcVQ3KAlbCyr1NeQlbiBsC6pCh5VBgbfOZmLGwir0oD4LirtTFwbSFrokWZrWBFrTr/fY+v/pL6OsH7GRtz6zJU8NBZW6my9l5jcBWKD7zguKZWVuPXRechDo5YwYs3J1aw2snr0c63h9bKSh0bCOhJNirTOyorQ8mWFfmRlXfGiCusoCVuJ+fpXIqK99RmzN9mXxjTinNo7x+XhQmHtBT81MRJ4zeRiZt+WzN7kGjFOtOg/qbbofqYFqbFWtXorVLqIrpXMk0VOjHJy42LIP7q6l7BGEj4/3p++kv3y+nZXpZUN2KP4zXrL1NZkurXmWhonNGwJzcpzVFe5A22lW6a+rzPlLpCf6SSMo4rCwjykDsaZK4YU8ZfE6cwa7qoV2m21Qbdqoktm6KMruXt77R5VILPm4EhaEWu0q1da4cLSDvZXFUTk4ex2ktlawzOtW8QWnZnb6xyeDW2UVqqpG3lHHGBnxJ/yWU3mWkJtYcMqd6vdyxmkM+chYt+hc1mF9WOwjDTLpR6vy+X9iL/n86vVkyCix9mtpwTj/3h+X/842lE9gqzs3L6+Y6i5U//R34l87+fVkvw7Wb2KNUJMJo367d1IFXjKEyFqfdao975FJzZ3XQOPq6qt2M4wyEYRwMgtbMrvcq5olh5LVM6H/dacHoPZ+thGb8F7Pv5RnvaZIqIzryn53DWfX2ene8Zs2nrWTdnzo6Jdu7qK2qxa8xyKfO8lK6ycGaXlY2tXvGgR8Zmj9zyN+Cz1qHXN0nzU7l6WrbCOSuKUXj5yJnaF9Vw8o2+4nnEHfk4lHtkK1jiP7XRPOFn3LiFHzMYu7Y8lgJ6PObI67PEq+s1Juf/7R0+AtGbUrtLNndFLbrieYeKI+FLh1veeqrAKB0zLe+M8SbJt+5iyVtkyB71L8swdFjXjt+yie40TrsdFylEFFPUdlWfa/NY3ao+webmX7TWEFZjYkuelr15dnd1PtJpEeptEWp/DFt0vKJ+1Z3HvW/KlDyQ13vmtwrqwyqpdSo9YkWzN2FG7p1NaRKRVvld0CITVuN/X2sRINmIbCUn1kxPC6rwasVFU6yYnEwprpGrkzO0+Bt9xTMVITr4YYtF95C/f9MC6NXMvJ3W4CU7dYyUoYCFhzTD7bD0qVvUAEJZKCyAsRLayqisgH9saKmPPD0BYALSEAEBYAEBYAAgLAAgLAAgLAGEBAGEBAGEBICwAICwAICwAk/EXcB35uIItNywAAAAASUVORK5CYII=';
+    foreach ([['HO', 'Grace Wanjiru', 'Nairobi office', ['AS-IT-0001'], true], ['HO', 'Samuel Lokol', 'Lodwar field office', ['AS-TEL-0101'], false]] as $k => [$pf, $emp, $loc, $codes, $signed]) {
+        $hid = $ins("INSERT INTO handovers (number, type, employee_id, location_id, created_by, created_at, token, signed_at, signed_name, signature, sign_method, email_status)
+                     VALUES (?, 'handover', ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Demo: emails are never sent')",
+            ["HO-$year-" . str_pad((string)($k + 1), 4, '0', STR_PAD_LEFT), $empId($emp), $locId($loc), $uid['storekeeper'], date('Y-m-d H:i:s', strtotime('-' . (10 - $k * 8) . ' days')),
+             bin2hex(random_bytes(24)), $signed ? date('Y-m-d H:i:s', strtotime('-9 days')) : null, $signed ? $emp : null, $signed ? $sigPng : null, $signed ? 'screen' : null]);
+        foreach ($codes as $ac) {
+            $ins("INSERT INTO handover_lines (handover_id, asset_id, from_text, cond) VALUES (?, ?, 'In store', 'good')", [$hid, $aIds[$ac]]);
+            $ins("INSERT INTO asset_events (asset_id, event, details, ref_type, ref_id) VALUES (?, 'handed over', ?, 'handover', ?)", [$aIds[$ac], "To $emp at $loc", $hid]);
+        }
+    }
+
     // A stock request waiting for the storekeeper
     $srId = $ins("INSERT INTO stock_requests (number, requester_id, warehouse_id, issue_to, destination, purpose, needed_by, created_at) VALUES (?, ?, ?, 'Rita Requester', 'Kakuma distribution point', 'Monthly hygiene distribution, 50 households', ?, ?)",
         ["SR-$year-0001", $uid['requester'], $whId('LOD'), date('Y-m-d', strtotime('+3 days')), date('Y-m-d H:i:s', strtotime('-1 day'))]);

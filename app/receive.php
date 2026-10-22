@@ -1,6 +1,6 @@
 <?php
 require __DIR__ . '/inc/bootstrap.php';
-require_once __DIR__ . '/inc/stock.php';
+require_once __DIR__ . '/inc/assets.php';
 $u = require_any(['storekeeper', 'admin']);
 
 $poId = (int)($_GET['po'] ?? $_POST['po'] ?? 0);
@@ -61,11 +61,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $poId) {
             $nStock++;
         } elseif ($t['type'] === 'asset') {
             $whName = q('SELECT name FROM warehouses WHERE id = ?', [$wh])->fetchColumn();
+            $locId = warehouse_location_id($wh);
             for ($k = 0; $k < (int)round($accQ); $k++) {
                 q("INSERT INTO assets (code, item_id, category_id, description, brand_model, serial_no, purchase_date, purchase_value, currency, supplier_id, po_id, grn_line_id,
-                      fin1_id, fin2_id, fin3_id, fin4_id, warehouse_id, location, cond, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', 'in_store')",
+                      fin1_id, fin2_id, fin3_id, fin4_id, warehouse_id, location_id, location, cond, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', 'in_store')",
                   [next_asset_code($l['cat_code']), $l['item_id'], $l['category_id'], $l['description'], $t['brand'] ?: $l['remarks'], $t['serials'][$k] ?? '', $date, $l['unit_price'],
-                   $po['currency'], $po['supplier_id'], $poId, $glId, $fin[1], $fin[2], $fin[3], $fin[4], $wh, $whName . ($t['bin'] ? ' · ' . $t['bin'] : '')]);
+                   $po['currency'], $po['supplier_id'], $poId, $glId, $fin[1], $fin[2], $fin[3], $fin[4], $wh, $locId, $whName . ($t['bin'] ? ' · ' . $t['bin'] : '')]);
+                asset_event((int)db()->lastInsertId(), 'received', 'Received on ' . $number . ' from ' . $po['supplier_name'], 'grn', $grnId);
                 $nAssets++;
             }
         }

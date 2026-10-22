@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 define('APP_ROOT', dirname(__DIR__));
-define('APP_VERSION', '0.6 (P2P, receiving, stock out, counts, traceability)');
+define('APP_VERSION', '0.7 (P2P, inventory, assets: handovers)');
 
 session_set_cookie_params(['httponly' => true, 'samesite' => 'Lax', 'secure' => !empty($_SERVER['HTTPS'])]);
 session_name('erp_session');

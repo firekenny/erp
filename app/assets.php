@@ -1,70 +1,88 @@
 <?php
 require __DIR__ . '/inc/bootstrap.php';
-require_once __DIR__ . '/inc/stock.php';
+require_once __DIR__ . '/inc/assets.php';
 require_any(['storekeeper', 'procurement', 'admin']);
 $canEdit = has_role('storekeeper') || has_role('admin');
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $canEdit) {
-    $id = (int)($_POST['id'] ?? 0);
-    $a = q('SELECT * FROM assets WHERE id = ?', [$id])->fetch();
-    if ($a) {
-        $sn = mb_substr(trim((string)($_POST['serial_no'] ?? '')), 0, 120);
-        if ($sn !== '' && q('SELECT code FROM assets WHERE serial_no = ? AND item_id = ? AND id <> ?', [$sn, $a['item_id'], $id])->fetchColumn()) { flash("Serial $sn is already on another asset.", 'err'); redirect("assets.php?edit=$id"); }
-        q('UPDATE assets SET serial_no = ?, brand_model = ?, cond = ?, notes = ? WHERE id = ?',
-          [$sn, mb_substr(trim((string)($_POST['brand_model'] ?? '')), 0, 190), array_key_exists($_POST['cond'] ?? '', ASSET_COND) ? $_POST['cond'] : $a['cond'], trim((string)($_POST['notes'] ?? '')), $id]);
-        audit('asset.edit', $a['code']);
-        flash('Asset ' . $a['code'] . ' updated.');
-    }
-    redirect('assets.php');
+// Old links (assets.php?edit=ID) now open the asset page
+if (isset($_GET['edit'])) redirect('asset_view.php?id=' . (int)$_GET['edit']);
+
+$f = [
+    's' => trim((string)($_GET['s'] ?? '')), 'c' => (int)($_GET['c'] ?? 0), 'st' => (string)($_GET['st'] ?? 'active'),
+    'loc' => (int)($_GET['loc'] ?? 0), 'emp' => (int)($_GET['emp'] ?? 0), 'fin' => (int)($_GET['fin'] ?? 0), 'missing' => !empty($_GET['missing']),
+];
+$where = ['1=1']; $p = [];
+if ($f['s'] !== '') { $where[] = '(a.code LIKE ? OR a.description LIKE ? OR a.serial_no LIKE ? OR a.brand_model LIKE ?)'; array_push($p, "%{$f['s']}%", "%{$f['s']}%", "%{$f['s']}%", "%{$f['s']}%"); }
+if ($f['c']) { $where[] = 'a.category_id = ?'; $p[] = $f['c']; }
+if ($f['st'] === 'active') $where[] = "a.status NOT IN ('disposed','lost')";
+elseif (isset(ASSET_STATUS[$f['st']])) { $where[] = 'a.status = ?'; $p[] = $f['st']; }
+if ($f['loc']) { $where[] = 'a.location_id = ?'; $p[] = $f['loc']; }
+if ($f['emp']) { $where[] = 'a.employee_id = ?'; $p[] = $f['emp']; }
+if ($f['fin']) { $where[] = '(a.fin1_id = ? OR a.fin2_id = ? OR a.fin3_id = ? OR a.fin4_id = ?)'; array_push($p, $f['fin'], $f['fin'], $f['fin'], $f['fin']); }
+if ($f['missing']) $where[] = "a.serial_no = ''";
+$rows = q('SELECT a.*, l.name AS loc_name, e.name AS emp_name, c.code AS cat_code FROM assets a JOIN categories c ON c.id = a.category_id
+           LEFT JOIN locations l ON l.id = a.location_id LEFT JOIN employees e ON e.id = a.employee_id WHERE ' . implode(' AND ', $where) . ' ORDER BY a.code LIMIT 1000', $p)->fetchAll();
+$codes = fin_code_map();
+
+if (isset($_GET['export'])) {
+    send_csv('asset_register_' . date('Y-m-d') . '.csv',
+        ['asset_id', 'description', 'category', 'brand_model', 'serial_no', 'purchase_date', 'purchase_value', 'currency', 'funding', 'location', 'held_by', 'condition', 'status', 'po'],
+        array_map(fn($a) => [$a['code'], $a['description'], $a['cat_code'], $a['brand_model'], $a['serial_no'], $a['purchase_date'], (float)$a['purchase_value'], $a['currency'],
+            fin_label($a, $codes), $a['loc_name'] ?? $a['location'], $a['emp_name'] ?? '', ASSET_COND[$a['cond']] ?? $a['cond'], ASSET_STATUS[$a['status']][0], (string)($a['po_id'] ? q('SELECT number FROM po WHERE id = ?', [$a['po_id']])->fetchColumn() : '')], $rows));
 }
 
-$s = trim((string)($_GET['s'] ?? '')); $fc = (int)($_GET['c'] ?? 0); $miss = !empty($_GET['missing']);
-$where = ['1=1']; $p = [];
-if ($s !== '') { $where[] = '(a.code LIKE ? OR a.description LIKE ? OR a.serial_no LIKE ? OR a.brand_model LIKE ?)'; array_push($p, "%$s%", "%$s%", "%$s%", "%$s%"); }
-if ($fc) { $where[] = 'a.category_id = ?'; $p[] = $fc; }
-if ($miss) $where[] = "a.serial_no = ''";
-$rows = q('SELECT a.*, po.number AS po_number, s.name AS supplier_name FROM assets a LEFT JOIN po ON po.id = a.po_id LEFT JOIN suppliers s ON s.id = a.supplier_id
-           WHERE ' . implode(' AND ', $where) . ' ORDER BY a.code LIMIT 500', $p)->fetchAll();
 $cats = q('SELECT DISTINCT c.id, c.code, c.name FROM categories c JOIN assets a ON a.category_id = c.id ORDER BY c.code')->fetchAll();
-$codes = fin_code_map();
-$edit = isset($_GET['edit']) ? q('SELECT a.*, po.number AS po_number FROM assets a LEFT JOIN po ON po.id = a.po_id WHERE a.id = ?', [(int)$_GET['edit']])->fetch() : null;
-$nMissing = (int)q("SELECT COUNT(*) FROM assets WHERE serial_no = ''")->fetchColumn();
+$fins = q('SELECT v.id, v.code, l.name AS level FROM fin_values v JOIN fin_levels l ON l.id = v.level_id ORDER BY l.position, v.code')->fetchAll();
+$nMissing = (int)q("SELECT COUNT(*) FROM assets WHERE serial_no = '' AND status NOT IN ('disposed','lost')")->fetchColumn();
+$unsigned = (int)q("SELECT COUNT(*) FROM handovers WHERE signed_at IS NULL AND type = 'handover'")->fetchColumn();
+$total = array_sum(array_map(fn($a) => (float)$a['purchase_value'], $rows));
 
-render_header('Asset register');
-if ($edit): ?>
-<div class="card">
-  <h2><?= e($edit['code']) ?> · <?= e($edit['description']) ?></h2>
-  <p class="muted">Bought <?= $edit['purchase_date'] ? e(date('d M Y', strtotime($edit['purchase_date']))) : '' ?> for <?= number_format((float)$edit['purchase_value'], 2) ?> <?= e($edit['currency']) ?> on <?= e($edit['po_number'] ?? '—') ?> ·
-    funded by <?= e(implode(' / ', array_filter([$codes[(int)$edit['fin1_id']] ?? '', $codes[(int)$edit['fin2_id']] ?? '', $codes[(int)$edit['fin3_id']] ?? '']))) ?> · location <?= e($edit['location']) ?></p>
-  <?php if ($canEdit): ?>
-  <form method="post"><?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$edit['id'] ?>">
-    <div class="row">
-      <div><label>Serial number</label><input type="text" name="serial_no" value="<?= e($edit['serial_no']) ?>" autofocus></div>
-      <div><label>Brand / model</label><input type="text" name="brand_model" value="<?= e($edit['brand_model']) ?>"></div>
-      <div><label>Condition</label><select name="cond"><?php foreach (ASSET_COND as $k => $l): ?><option value="<?= $k ?>" <?= $edit['cond'] === $k ? 'selected' : '' ?>><?= $l ?></option><?php endforeach; ?></select></div>
-    </div>
-    <label>Notes</label><textarea name="notes" rows="2"><?= e($edit['notes']) ?></textarea>
-    <div class="actions"><button class="btn">Save</button><a href="assets.php">Back to register</a></div>
-  </form>
-  <?php endif; ?>
+render_header('Asset register'); ?>
+<div class="actions" style="margin:0 0 12px">
+  <?php if ($canEdit): ?><a class="btn sec small" href="assets_import.php">Import existing register</a><a class="btn sec small" href="handovers.php">Handovers<?= $unsigned ? " ($unsigned unsigned)" : '' ?></a><?php endif; ?>
+  <a class="btn sec small" style="margin-left:auto" href="?<?= e(http_build_query($_GET + ['export' => 1])) ?>">Export to Excel (CSV)</a>
+</div>
+<form method="get" class="card" style="padding:12px">
+  <div class="row" style="align-items:flex-end">
+    <div style="flex:2"><input type="text" name="s" value="<?= e($f['s']) ?>" placeholder="Search asset ID, description, serial, brand"></div>
+    <div><select name="c"><option value="0">All categories</option><?php foreach ($cats as $c): ?><option value="<?= (int)$c['id'] ?>" <?= $f['c'] === (int)$c['id'] ? 'selected' : '' ?>><?= e($c['code'] . ' – ' . $c['name']) ?></option><?php endforeach; ?></select></div>
+    <div><select name="st"><option value="active" <?= $f['st'] === 'active' ? 'selected' : '' ?>>In service</option><option value="" <?= $f['st'] === '' ? 'selected' : '' ?>>All statuses</option>
+      <?php foreach (ASSET_STATUS as $k => [$l]): ?><option value="<?= $k ?>" <?= $f['st'] === $k ? 'selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?></select></div>
+  </div>
+  <div class="row" style="align-items:flex-end">
+    <div><select name="loc"><option value="0">All locations</option><?php foreach (locations(false) as $l): ?><option value="<?= (int)$l['id'] ?>" <?= $f['loc'] === (int)$l['id'] ? 'selected' : '' ?>><?= e($l['name']) ?></option><?php endforeach; ?></select></div>
+    <div><select name="emp"><option value="0">Any holder</option><?php foreach (employees(false) as $e): ?><option value="<?= (int)$e['id'] ?>" <?= $f['emp'] === (int)$e['id'] ? 'selected' : '' ?>><?= e($e['name']) ?></option><?php endforeach; ?></select></div>
+    <div><select name="fin"><option value="0">Any funding</option><?php $last = null; foreach ($fins as $v): if ($v['level'] !== $last) { if ($last) echo '</optgroup>'; echo '<optgroup label="' . e($v['level']) . '">'; $last = $v['level']; } ?><option value="<?= (int)$v['id'] ?>" <?= $f['fin'] === (int)$v['id'] ? 'selected' : '' ?>><?= e($v['code']) ?></option><?php endforeach; if ($last) echo '</optgroup>'; ?></select></div>
+    <label class="checks" style="flex:0;white-space:nowrap;font-weight:400"><input type="checkbox" name="missing" value="1" <?= $f['missing'] ? 'checked' : '' ?>> Missing serial (<?= $nMissing ?>)</label>
+    <div style="flex:0"><button class="btn sec">Filter</button></div>
+  </div>
+</form>
+
+<form method="get" action="handover.php" id="sel">
+<?php if ($canEdit): ?>
+<div class="actions" id="bulk" style="margin:0 0 8px;display:none">
+  <span class="muted"><b id="nsel">0</b> selected:</span>
+  <button class="btn small" name="type" value="handover">Hand over to a person</button>
+  <button class="btn sec small" name="type" value="move">Move to a location</button>
+  <button class="btn sec small" name="type" value="return">Return to store</button>
 </div>
 <?php endif; ?>
-<form method="get" class="row" style="margin-bottom:10px;align-items:flex-end">
-  <div style="flex:2"><input type="text" name="s" value="<?= e($s) ?>" placeholder="Search asset ID, description, serial, brand"></div>
-  <div><select name="c"><option value="0">All categories</option><?php foreach ($cats as $c): ?><option value="<?= (int)$c['id'] ?>" <?= $fc === (int)$c['id'] ? 'selected' : '' ?>><?= e($c['code'] . ' – ' . $c['name']) ?></option><?php endforeach; ?></select></div>
-  <label class="checks" style="flex:0;white-space:nowrap;font-weight:400"><input type="checkbox" name="missing" value="1" <?= $miss ? 'checked' : '' ?>> Missing serial (<?= $nMissing ?>)</label>
-  <div style="flex:0"><button class="btn sec">Filter</button></div>
-</form>
 <div class="table-wrap"><table>
-  <tr><th>Asset ID</th><th>Description</th><th>Serial</th><th>Location</th><th>Funding</th><th style="text-align:right">Value</th><th>Status</th></tr>
-  <?php if (!$rows): ?><tr><td colspan="7" class="muted">No assets yet. Assets are registered automatically when asset items are received.</td></tr><?php endif; ?>
-  <?php foreach ($rows as $a): ?>
-  <tr><td><a href="?edit=<?= (int)$a['id'] ?>"><b><?= e($a['code']) ?></b></a></td><td><?= e($a['description']) ?><?php if ($a['brand_model']): ?><br><span class="muted"><?= e($a['brand_model']) ?></span><?php endif; ?></td>
-    <td><?= $a['serial_no'] !== '' ? e($a['serial_no']) : '<span class="tag warn">missing</span>' ?></td><td><?= e($a['location']) ?><?= $a['custodian'] ? '<br><span class="muted">' . e($a['custodian']) . '</span>' : '' ?></td>
-    <td class="muted"><?= e(implode(' / ', array_filter([$codes[(int)$a['fin1_id']] ?? '', $codes[(int)$a['fin2_id']] ?? '']))) ?></td>
+  <tr><?php if ($canEdit): ?><th style="width:30px"><input type="checkbox" onclick="document.querySelectorAll('.ck').forEach(c=>c.checked=this.checked);upd()"></th><?php endif; ?>
+    <th>Asset ID</th><th>Description</th><th>Serial</th><th>Where · held by</th><th>Funding</th><th style="text-align:right">Value</th><th>Status</th></tr>
+  <?php if (!$rows): ?><tr><td colspan="8" class="muted">No assets match. Assets are created automatically when asset items are received, or imported from an existing register.</td></tr><?php endif; ?>
+  <?php foreach ($rows as $a): $active = !in_array($a['status'], ['disposed', 'lost'], true); ?>
+  <tr><?php if ($canEdit): ?><td><?php if ($active): ?><input type="checkbox" class="ck" name="a[]" value="<?= (int)$a['id'] ?>" onchange="upd()"><?php endif; ?></td><?php endif; ?>
+    <td><a href="asset_view.php?id=<?= (int)$a['id'] ?>"><b><?= e($a['code']) ?></b></a></td>
+    <td><?= e($a['description']) ?><?php if ($a['brand_model']): ?><br><span class="muted"><?= e($a['brand_model']) ?></span><?php endif; ?></td>
+    <td><?= $a['serial_no'] !== '' ? e($a['serial_no']) : '<span class="tag warn">missing</span>' ?></td>
+    <td><?= e($a['loc_name'] ?? $a['location']) ?><?= $a['emp_name'] ? '<br><b>' . e($a['emp_name']) . '</b>' : '' ?></td>
+    <td class="muted"><?= e(fin_label($a, $codes)) ?></td>
     <td style="text-align:right;white-space:nowrap"><?= number_format((float)$a['purchase_value'], 2) ?> <?= e($a['currency']) ?></td>
     <td><span class="tag <?= ASSET_STATUS[$a['status']][1] ?>"><?= ASSET_STATUS[$a['status']][0] ?></span></td></tr>
   <?php endforeach; ?>
+  <?php if ($rows): ?><tr><td colspan="<?= $canEdit ? 6 : 5 ?>" style="text-align:right"><b><?= count($rows) ?> asset(s) · total purchase value</b></td><td style="text-align:right"><b><?= number_format($total, 2) ?></b></td><td></td></tr><?php endif; ?>
 </table></div>
-<p class="muted">Movements, handover to staff with signature, physical counts and depreciation come in a later build step.</p>
+</form>
+<script>function upd(){const n=document.querySelectorAll('.ck:checked').length;const b=document.getElementById('bulk');if(b){b.style.display=n?'flex':'none';document.getElementById('nsel').textContent=n;}}</script>
 <?php render_footer();
