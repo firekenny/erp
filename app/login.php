@@ -52,7 +52,7 @@ render_header('Sign in');
 if (is_demo()): ?>
 <div class="card">
   <h2>Try the demo: choose a role</h2>
-  <p class="muted">No password needed. Sample data is reset every night, so feel free to explore and change anything.</p>
+  <p class="muted">No password needed. Sample data is reset every night, so feel free to explore and change anything. New here? Read the <a href="help.php">demo guide and 20-minute tour</a>.</p>
   <form method="post">
     <?= csrf_field() ?>
     <?php foreach (DEMO_ACCOUNTS as $role => [$name, , $what]): ?>
@@ -68,6 +68,6 @@ if (is_demo()): ?>
   <label>Email</label><input type="email" name="email" value="<?= e($email) ?>" required autofocus>
   <label>Password</label><input type="password" name="password" required>
   <div class="actions"><button class="btn">Sign in</button></div>
-  <p class="muted"><a href="forgot.php">Forgot your password?</a></p>
+  <p class="muted"><a href="forgot.php">Forgot your password?</a> · <a href="help.php">User guide</a></p>
 </form>
 <?php render_footer();

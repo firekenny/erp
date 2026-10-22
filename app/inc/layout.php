@@ -13,6 +13,7 @@ function render_header(string $title): void {
         if (function_exists('pr_counts')) { $c = pr_counts($u); $n = $c['to_approve'] + $c['self_blocked'] + $c['returned'] + (function_exists('award_pending_count') ? award_pending_count($u) : 0); if ($n) $prLabel .= " ($n)"; }
         $nav[] = [$prLabel, 'pr.php'];
         if (has_role('requester') && !has_role('storekeeper')) $nav[] = ['Stock requests', 'requests.php'];
+        $nav[] = ['Help', 'help.php'];
         if (has_role('procurement') || has_role('admin')) {
             $nav[] = ['Procurement', null];
             $nWait = (int)q("SELECT COUNT(*) FROM pr WHERE status = 'approved'")->fetchColumn();
