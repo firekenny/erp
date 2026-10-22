@@ -69,6 +69,12 @@ if ($lv && isset($_GET['template'])) {
 
 $s = trim((string)($_GET['s'] ?? ''));
 $rows = $lv ? budget_rows() : [];
+$canMine = has_role('budget_holder');
+$mine = $canMine && (string)($_GET['mine'] ?? ((has_role('admin') || has_role('finance')) ? '0' : '1')) === '1';
+if ($mine) {
+    $myCodes = array_map('intval', q('SELECT id FROM fin_values WHERE approver_user_id = ?', [$u['id']])->fetchAll(PDO::FETCH_COLUMN));
+    $rows = array_values(array_filter($rows, fn($r) => in_array((int)$r['a_value_id'], $myCodes, true) || in_array((int)$r['b_value_id'], $myCodes, true)));
+}
 if ($s !== '') $rows = array_values(array_filter($rows, fn($r) => stripos($r['a_code'] . ' ' . $r['a_name'] . ' ' . $r['b_code'] . ' ' . $r['b_name'] . ' ' . $r['donor_code'], $s) !== false));
 if ($lv && isset($_GET['xlsx'])) xlsx_send('budget_report_' . date('Y-m-d') . '.xlsx', [['name' => 'Budget report',
     'header' => array_values(array_filter(['Parent code', $lv[2]['name'], $lv[2]['name'] . ' name', $lv[3] ? $lv[3]['name'] : null, $lv[3] ? $lv[3]['name'] . ' name' : null, 'Budget', 'Committed (POs not invoiced)', 'Actual (invoiced)', 'Left', '% used'])),
@@ -101,8 +107,10 @@ foreach ($rows as $r) foreach ($tot as $k => $_) $tot[$k] += (float)$r[$k]; ?>
 <?php if ($foreign): ?><div class="flash warn"><?= (int)$foreign ?> Purchase Order line(s) are in another currency than <?= e($cur) ?>: they are counted at face value, without conversion.</div><?php endif; ?>
 <form method="get" class="row" style="margin-bottom:10px;align-items:flex-end">
   <div style="flex:2"><input type="text" name="s" value="<?= e($s) ?>" placeholder="Search a code or name"></div>
-  <div style="flex:0;white-space:nowrap"><button class="btn sec">Filter</button> <a class="btn sec" href="?<?= e(http_build_query(['s' => $s, 'xlsx' => 1])) ?>">Excel</a></div>
+  <?php if ($canMine): ?><div style="flex:0;white-space:nowrap"><input type="hidden" name="mine" value="0"><label style="margin:0"><input type="checkbox" name="mine" value="1" <?= $mine ? 'checked' : '' ?> onchange="this.form.submit()"> Only my cost centres</label></div><?php endif; ?>
+  <div style="flex:0;white-space:nowrap"><button class="btn sec">Filter</button> <a class="btn sec" href="?<?= e(http_build_query(['s' => $s, 'mine' => $mine ? 1 : 0, 'xlsx' => 1])) ?>">Excel</a></div>
 </form>
+<?php if ($canMine): ?><p class="muted" style="margin-top:-4px">The requests charged to your cost centres, and where they are now (approved, RFQ, ordered): <a href="pr.php?tab=cc">Purchase Requests &gt; My cost centres</a>.</p><?php endif; ?>
 <form method="post"><?= csrf_field() ?><input type="hidden" name="act" value="save">
 <div class="table-wrap"><table>
   <tr><th><?= e($lv[2]['name']) ?></th><?php if ($lv[3]): ?><th><?= e($lv[3]['name']) ?></th><?php endif; ?><th style="text-align:right">Budget</th><th style="text-align:right">Committed</th><th style="text-align:right">Actual</th><th style="text-align:right">Left</th><th style="min-width:120px">Used</th><?php if ($isAdmin): ?><th>Delete</th><?php endif; ?></tr>

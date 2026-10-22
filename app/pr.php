@@ -14,6 +14,7 @@ if ((has_role('budget_holder') || has_role('admin'))) {
         if ($r && award_decidable($r, $u)) $awardsToApprove[] = $r;
     }
 }
+if (has_role('budget_holder')) $tabs['cc'] = 'My cost centres';
 if ($canAll) $tabs['all'] = 'All requests';
 if (!$tabs) { render_header('Purchase Requests'); echo '<div class="card">Your role has no access to Purchase Requests.</div>'; render_footer(); exit; }
 
@@ -32,6 +33,12 @@ if ($tab === 'approve') {
     $p[] = $u['id']; $p[] = $u['id'];
 }
 if ($tab === 'all') $where[] = "p.status <> 'draft'";
+if ($tab === 'cc') {
+    // every request with a line charged to a code this person is Budget Holder for
+    $pos = (int)q('SELECT position FROM fin_levels WHERE id = ?', [(int)setting('approval_level_id', '0')])->fetchColumn();
+    $where[] = "p.status <> 'draft' AND EXISTS (SELECT 1 FROM pr_lines l JOIN fin_values v ON v.id = l.fin" . max(1, min(4, $pos)) . "_id WHERE l.pr_id = p.id AND v.approver_user_id = ?)";
+    $p[] = $u['id'];
+}
 if (isset(PR_STATUS[$st]) && $tab !== 'approve') { $where[] = 'p.status = ?'; $p[] = $st; }
 if ($s !== '') { $where[] = '(p.number LIKE ? OR p.title LIKE ?)'; $p[] = "%$s%"; $p[] = "%$s%"; }
 
