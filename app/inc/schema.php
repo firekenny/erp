@@ -6,7 +6,7 @@ declare(strict_types=1);
  * After each deploy, the app upgrades the database by itself on the next page load —
  * no manual SQL needed.
  */
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 function schema_migrations(): array {
     return [
@@ -141,6 +141,18 @@ function schema_migrations(): array {
                 KEY ix_pr (pr_id),
                 CONSTRAINT fk_prh_pr FOREIGN KEY (pr_id) REFERENCES pr(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        ],
+        4 => [
+            // Approval thresholds: higher approval levels above the cost centre Budget Holder
+            "CREATE TABLE IF NOT EXISTS approval_levels (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(80) NOT NULL,
+                min_amount DECIMAL(14,2) NOT NULL,
+                approver_user_id INT NULL,
+                active TINYINT(1) NOT NULL DEFAULT 1,
+                CONSTRAINT fk_al_user FOREIGN KEY (approver_user_id) REFERENCES users(id) ON DELETE SET NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "ALTER TABLE pr_approvals ADD COLUMN stage TINYINT NOT NULL DEFAULT 1, ADD COLUMN level_name VARCHAR(80) NULL",
         ],
     ];
 }

@@ -76,14 +76,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     q('DELETE FROM pr_approvals WHERE pr_id = ?', [$id]);
     $selfApproval = false;
     foreach ($route as $r) {
-        q('INSERT INTO pr_approvals (pr_id, approver_id, fin_value_id) VALUES (?, ?, ?)', [$id, $r['approver_id'], $r['fin_value_id']]);
+        q('INSERT INTO pr_approvals (pr_id, approver_id, fin_value_id, stage, level_name) VALUES (?, ?, ?, ?, ?)', [$id, $r['approver_id'], $r['fin_value_id'], $r['stage'], $r['level_name']]);
         if ($r['approver_id'] === (int)$u['id']) $selfApproval = true;
     }
     q("UPDATE pr SET status = 'submitted', submitted_at = NOW() WHERE id = ?", [$id]);
     pr_log($id, 'submitted');
     db()->commit();
-    $names = q('SELECT DISTINCT u.name FROM pr_approvals a JOIN users u ON u.id = a.approver_id WHERE a.pr_id = ?', [$id])->fetchAll(PDO::FETCH_COLUMN);
-    flash('Submitted for approval to ' . implode(', ', $names) . '.' . ($selfApproval ? ' You are the Budget Holder for part of it, so an Administrator will approve that part.' : ''));
+    $names = q('SELECT DISTINCT u.name FROM pr_approvals a JOIN users u ON u.id = a.approver_id WHERE a.pr_id = ? AND a.stage = 1', [$id])->fetchAll(PDO::FETCH_COLUMN);
+    $higher = q('SELECT a.level_name, u.name FROM pr_approvals a JOIN users u ON u.id = a.approver_id WHERE a.pr_id = ? AND a.stage > 1 ORDER BY a.stage', [$id])->fetchAll();
+    flash('Submitted for approval to ' . implode(', ', $names) . '.'
+        . ($higher ? ' Because of the amount, it then goes to ' . implode(', then ', array_map(fn($h) => $h['name'] . ' (' . $h['level_name'] . ')', $higher)) . '.' : '') . ($selfApproval ? ' You are the Budget Holder for part of it, so an Administrator will approve that part.' : ''));
     redirect("pr_view.php?id=$id");
 }
 

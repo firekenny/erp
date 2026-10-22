@@ -121,6 +121,9 @@ function demo_seed(PDO $pdo): void {
         }
     }
 
+    // Approval threshold: above 5,000 USD the Country Director (Alex) approves after the Budget Holder
+    $ins('INSERT INTO approval_levels (name, min_amount, approver_user_id) VALUES (?, ?, ?)', ['Country Director', 5000, $uid['admin']]);
+
     // Sample Purchase Requests, one per status
     $fid  = fn(string $code) => (int)$pdo->query('SELECT id FROM fin_values WHERE code = ' . $pdo->quote($code))->fetchColumn();
     $iid  = fn(string $code) => $pdo->query('SELECT id, unit FROM items WHERE code = ' . $pdo->quote($code))->fetch(PDO::FETCH_ASSOC);
@@ -143,8 +146,12 @@ function demo_seed(PDO $pdo): void {
         if ($status === 'draft') return;
         $hist($req, 'submitted');
         [$approver, $state, $comment, $by] = $flow;
-        $ins('INSERT INTO pr_approvals (pr_id, approver_id, fin_value_id, status, comment, decided_by, decided_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-             [$prId, $uid[$approver], $fid($cc), $state, $comment, $state === 'pending' ? null : $uid[$by], $state === 'pending' ? null : $created]);
+        $ins('INSERT INTO pr_approvals (pr_id, approver_id, fin_value_id, status, comment, decided_by, decided_at, stage, level_name) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)',
+             [$prId, $uid[$approver], $fid($cc), $state, $comment, $state === 'pending' ? null : $uid[$by], $state === 'pending' ? null : $created, 'Budget Holder']);
+        $total = array_sum(array_map(fn($l) => $l[2] * $l[3], $lines));
+        if ($total > 5000 && $uid[$approver] !== $uid['admin'] && $state === 'pending') {
+            $ins("INSERT INTO pr_approvals (pr_id, approver_id, status, stage, level_name) VALUES (?, ?, 'pending', 2, 'Country Director')", [$prId, $uid['admin']]);
+        }
         if ($state === 'approved') { $hist($by, 'approved', $comment); $hist($by, 'fully approved'); }
         if ($state === 'returned') $hist($by, 'returned', $comment);
     };

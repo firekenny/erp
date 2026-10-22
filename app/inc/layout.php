@@ -17,6 +17,7 @@ function render_header(string $title): void {
             $nav[] = ['Organisation', 'settings.php'];
             $nav[] = ['Users & roles', 'users.php'];
             $nav[] = ['Finance codes', 'finance.php'];
+            $nav[] = ['Approval thresholds', 'approvals.php'];
             $nav[] = ['Item categories', 'categories.php'];
             $nav[] = ['Item catalogue', 'items.php'];
         }

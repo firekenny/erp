@@ -20,6 +20,7 @@ if ($tab === 'mine') { $where[] = 'p.requester_id = ?'; $p[] = $u['id']; }
 if ($tab === 'approve') {
     // own pending approvals; admins also see PRs where the requester is their own budget holder
     $where[] = "p.status = 'submitted' AND p.requester_id <> ? AND EXISTS (SELECT 1 FROM pr_approvals a WHERE a.pr_id = p.id AND a.status = 'pending'"
+             . " AND " . PR_CURRENT_STAGE
              . (has_role('admin') ? " AND (a.approver_id = ? OR a.approver_id = p.requester_id))" : " AND a.approver_id = ?)");
     $p[] = $u['id']; $p[] = $u['id'];
 }

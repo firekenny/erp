@@ -49,6 +49,7 @@ render_header('Dashboard'); ?>
       ['Finance coding levels defined (e.g. Donor → Grant → Budget line)', $c['levels'] > 0, 'finance.php'],
       ['Finance codes entered or imported', $c['codes'] > 0, 'finance.php'],
       ['Budget Holder assigned on approval-level codes', $approvers > 0, 'finance.php'],
+      ['Approval thresholds by amount (optional)', (int)q('SELECT COUNT(*) FROM approval_levels WHERE active = 1')->fetchColumn() > 0, 'approvals.php'],
       ['Item categories created', $c['cats'] > 0, 'categories.php'],
       ['Item catalogue entered or imported', $c['items'] > 0, 'items.php'],
       ['Users invited', $c['users'] > 1, 'users.php'],

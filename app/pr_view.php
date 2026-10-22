@@ -37,7 +37,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 pr_log($id, 'fully approved');
                 flash('Approved. The request now goes to Procurement.');
             } else {
-                flash("Your approval is recorded. Still waiting for $left other approval(s).");
+                $next = q("SELECT DISTINCT u.name, a.level_name FROM pr_approvals a JOIN users u ON u.id = a.approver_id WHERE a.pr_id = ? AND a.status = 'pending' AND " . PR_CURRENT_STAGE, [$id])->fetchAll();
+                flash('Your approval is recorded. Now waiting for ' . implode(', ', array_map(fn($x) => $x['name'] . ($x['level_name'] && $x['level_name'] !== 'Budget Holder' ? ' (' . $x['level_name'] . ')' : ''), $next)) . '.');
             }
         }
         db()->commit();
@@ -66,7 +67,8 @@ $levels = fin_levels();
 $codes = fin_code_map();
 $approvals = q('SELECT a.*, u.name AS approver_name, d.name AS decided_name, v.code AS fin_code, v.name AS fin_name
                 FROM pr_approvals a JOIN users u ON u.id = a.approver_id LEFT JOIN users d ON d.id = a.decided_by
-                LEFT JOIN fin_values v ON v.id = a.fin_value_id WHERE a.pr_id = ? ORDER BY a.id', [$id])->fetchAll();
+                LEFT JOIN fin_values v ON v.id = a.fin_value_id WHERE a.pr_id = ? ORDER BY a.stage, a.id', [$id])->fetchAll();
+$curStage = (int)q("SELECT MIN(stage) FROM pr_approvals WHERE pr_id = ? AND status = 'pending'", [$id])->fetchColumn();
 $history = q('SELECT h.*, u.name FROM pr_history h LEFT JOIN users u ON u.id = h.user_id WHERE h.pr_id = ? ORDER BY h.id', [$id])->fetchAll();
 $decidable = pr_decidable($pr, $u);
 $apprLvl = (int)setting('approval_level_id', '0');
@@ -90,7 +92,9 @@ render_header($pr['number']); ?>
   <?php if (!array_filter($decidable, fn($a) => (int)$a['approver_id'] === (int)$u['id'])): ?>
     <p class="flash warn">You are deciding as Administrator on behalf of <?= e(implode(', ', array_unique(array_column($decidable, 'approver_name')))) ?><?= in_array((int)$pr['requester_id'], array_map('intval', array_column($decidable, 'approver_id')), true) ? ' (the requester is their own Budget Holder)' : '' ?>.</p>
   <?php else: ?>
-    <p class="muted">You approve the lines charged to: <b><?= e(implode(', ', array_column(array_filter($decidable, fn($a) => (int)$a['approver_id'] === (int)$u['id']), 'fin_code'))) ?></b> (highlighted below).</p>
+    <?php $mineRows = array_filter($decidable, fn($a) => (int)$a['approver_id'] === (int)$u['id']); $mineCodes = array_filter(array_column($mineRows, 'fin_code')); ?>
+    <?php if ($mineCodes): ?><p class="muted">You approve as Budget Holder the lines charged to: <b><?= e(implode(', ', $mineCodes)) ?></b> (highlighted below).</p>
+    <?php else: ?><p class="muted">You approve the whole request as <b><?= e(implode(', ', array_unique(array_column($mineRows, 'level_name')))) ?></b>, because its total is above your approval threshold. Earlier steps are already approved.</p><?php endif; ?>
   <?php endif; ?>
   <form method="post">
     <?= csrf_field() ?><input type="hidden" name="id" value="<?= $id ?>">
@@ -136,12 +140,13 @@ render_header($pr['number']); ?>
 <div class="card" style="margin-top:16px">
   <h2>Approvals</h2>
   <table>
-    <tr><th>For</th><th>Budget Holder</th><th>Status</th><th>Decided</th><th>Comment</th></tr>
+    <tr><th>Step</th><th>For</th><th>Approver</th><th>Status</th><th>Decided</th><th>Comment</th></tr>
     <?php foreach ($approvals as $a): ?>
     <tr>
-      <td><b><?= e($a['fin_code']) ?></b> <span class="muted"><?= e($a['fin_name']) ?></span></td>
+      <td><?= (int)$a['stage'] ?></td>
+      <td><?php if ($a['fin_code']): ?><b><?= e($a['fin_code']) ?></b> <span class="muted"><?= e($a['fin_name']) ?></span><?php else: ?><b><?= e($a['level_name']) ?></b> <span class="muted">amount threshold</span><?php endif; ?></td>
       <td><?= e($a['approver_name']) ?></td>
-      <td><?= ['pending' => '<span class="tag">Pending</span>', 'approved' => '<span class="tag stock">Approved</span>', 'returned' => '<span class="tag warn">Returned</span>'][$a['status']] ?></td>
+      <td><?= $a['status'] === 'pending' && $pr['status'] === 'submitted' && (int)$a['stage'] > $curStage ? '<span class="tag off">Waiting for step ' . $curStage . '</span>' : ['pending' => '<span class="tag">Pending</span>', 'approved' => '<span class="tag stock">Approved</span>', 'returned' => '<span class="tag warn">Returned</span>'][$a['status']] ?></td>
       <td><?= $a['decided_at'] ? e(date('d M Y H:i', strtotime($a['decided_at']))) . ($a['decided_by'] && (int)$a['decided_by'] !== (int)$a['approver_id'] ? '<br><span class="muted">by ' . e($a['decided_name']) . '</span>' : '') : '' ?></td>
       <td><?= e($a['comment']) ?></td>
     </tr>
