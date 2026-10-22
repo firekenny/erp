@@ -6,7 +6,7 @@ declare(strict_types=1);
  * After each deploy, the app upgrades the database by itself on the next page load —
  * no manual SQL needed.
  */
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 function schema_migrations(): array {
     return [
@@ -79,6 +79,10 @@ function schema_migrations(): array {
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 KEY ix_created (created_at)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        ],
+        2 => [
+            // Each level is either filtered by the level above (linked = 1) or one independent list (linked = 0)
+            "ALTER TABLE fin_levels ADD COLUMN linked TINYINT(1) NOT NULL DEFAULT 1",
         ],
     ];
 }

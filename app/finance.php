@@ -8,7 +8,13 @@ $apprLvl  = (int)setting('approval_level_id', '0');
 $curId    = (int)($_GET['level'] ?? ($levels[0]['id'] ?? 0));
 $cur      = $levelsById[$curId] ?? null;
 $parentLv = null;
-if ($cur) foreach ($levels as $l) if ((int)$l['position'] === (int)$cur['position'] - 1) $parentLv = $l;
+if ($cur && (int)$cur['linked'] === 1) foreach ($levels as $l) if ((int)$l['position'] === (int)$cur['position'] - 1) $parentLv = $l;
+
+/** Name of the level just above a given level (or null for level 1) */
+function level_above(array $levels, array $lv): ?array {
+    foreach ($levels as $l) if ((int)$l['position'] === (int)$lv['position'] - 1) return $l;
+    return null;
+}
 
 function back(int $lv = 0): void { redirect('finance.php' . ($lv ? '?level=' . $lv : '')); }
 
@@ -35,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (count($levels) >= 4) flash('Maximum 4 levels.', 'err');
         elseif ($name === '') flash('Give the level a name.', 'err');
         else {
-            q('INSERT INTO fin_levels (position, name, required) VALUES (?, ?, ?)', [count($levels) + 1, $name, isset($_POST['required']) ? 1 : 0]);
+            q('INSERT INTO fin_levels (position, name, required, linked) VALUES (?, ?, ?, ?)', [count($levels) + 1, $name, isset($_POST['required']) ? 1 : 0, isset($_POST['linked']) ? 1 : 0]);
             $nid = (int)db()->lastInsertId();
             audit('fin.level.add', $name);
             flash("Level \"$name\" added.");
@@ -46,9 +52,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($act === 'edit_level') {
         $id = (int)$_POST['id']; $name = trim((string)($_POST['name'] ?? ''));
         if ($name !== '' && isset($levelsById[$id])) {
-            q('UPDATE fin_levels SET name = ?, required = ? WHERE id = ?', [$name, isset($_POST['required']) ? 1 : 0, $id]);
-            audit('fin.level.edit', "#$id $name");
-            flash('Level updated.');
+            $linked = ((int)$levelsById[$id]['position'] > 1 && isset($_POST['linked'])) ? 1 : 0;
+            q('UPDATE fin_levels SET name = ?, required = ?, linked = ? WHERE id = ?', [$name, isset($_POST['required']) ? 1 : 0, $linked, $id]);
+            if (!$linked) q('UPDATE fin_values SET parent_id = NULL WHERE level_id = ?', [$id]);
+            audit('fin.level.edit', "#$id $name linked=$linked");
+            if ($linked && !(int)$levelsById[$id]['linked'] && (int)q('SELECT COUNT(*) FROM fin_values WHERE level_id = ? AND parent_id IS NULL', [$id])->fetchColumn() > 0) {
+                flash('Level updated. Its existing codes are not attached to a parent yet: edit them (or re-import with parent_code) to attach them.', 'warn');
+            } else {
+                flash('Level updated.');
+            }
         }
         back($id);
     }
@@ -154,11 +166,12 @@ render_header('Finance codes'); ?>
 
 <div class="card">
   <h2>Coding levels</h2>
-  <p class="muted">Define how your organisation codes expenses, top to bottom (up to 4 levels). Each level filters the next one in the Purchase Request dropdowns.
+  <p class="muted">Define how your organisation codes expenses, top to bottom (up to 4 levels). Tick <b>Filtered by…</b> when each code belongs to one code of the level above (e.g. a grant belongs to one donor).
+  Untick it for shared lists such as <b>budget lines</b>, which are the same whatever the donor or cost centre.
   Example: <b>Donor</b> → <b>Grant</b> → <b>Budget line</b> → <b>Cost centre</b>.</p>
   <?php if ($levels): ?>
   <div class="table-wrap"><table>
-    <tr><th>#</th><th>Level name</th><th>Mandatory on PR</th><th>Codes</th><th></th></tr>
+    <tr><th>#</th><th>Level name</th><th>Options</th><th>Codes</th><th></th></tr>
     <?php foreach ($levels as $i => $l): $n = (int)q('SELECT COUNT(*) FROM fin_values WHERE level_id = ?', [$l['id']])->fetchColumn(); ?>
     <tr>
       <td><?= (int)$l['position'] ?></td>
@@ -166,7 +179,10 @@ render_header('Finance codes'); ?>
         <form method="post" class="row" style="align-items:center;margin:0">
           <?= csrf_field() ?><input type="hidden" name="act" value="edit_level"><input type="hidden" name="id" value="<?= (int)$l['id'] ?>">
           <input type="text" name="name" value="<?= e($l['name']) ?>" style="max-width:240px">
-          <label class="checks" style="margin:0;font-weight:400;flex:0"><input type="checkbox" name="required" <?= $l['required'] ? 'checked' : '' ?>> Mandatory</label>
+          <label class="checks" style="margin:0;font-weight:400;flex:0;white-space:nowrap"><input type="checkbox" name="required" <?= $l['required'] ? 'checked' : '' ?>> Mandatory</label>
+          <?php if ($i > 0): ?>
+          <label class="checks" style="margin:0;font-weight:400;flex:0;white-space:nowrap" title="Ticked: each code belongs to one <?= e($levels[$i - 1]['name']) ?>. Unticked: one shared list used with any <?= e($levels[$i - 1]['name']) ?>."><input type="checkbox" name="linked" <?= $l['linked'] ? 'checked' : '' ?>> Filtered by <?= e($levels[$i - 1]['name']) ?></label>
+          <?php endif; ?>
           <button class="btn sec small" style="flex:0">Save</button>
         </form>
       </td>
@@ -183,6 +199,7 @@ render_header('Finance codes'); ?>
     <?= csrf_field() ?><input type="hidden" name="act" value="add_level">
     <div><label>Add level <?= count($levels) + 1 ?></label><input type="text" name="name" placeholder="<?= ['Donor', 'Grant', 'Budget line', 'Cost centre'][count($levels)] ?>"></div>
     <label class="checks" style="flex:0;white-space:nowrap"><input type="checkbox" name="required" checked> Mandatory</label>
+    <?php if ($levels): ?><label class="checks" style="flex:0;white-space:nowrap"><input type="checkbox" name="linked" checked> Filtered by <?= e(end($levels)['name']) ?></label><?php endif; ?>
     <div style="flex:0"><button class="btn">Add level</button></div>
   </form>
   <?php endif; ?>
@@ -229,6 +246,7 @@ render_header('Finance codes'); ?>
         </select></div>
       <?php endif; ?>
     </div>
+    <?php if (!$parentLv && (int)$cur['position'] > 1): ?><p class="muted">This is one shared list: its codes can be combined with any <?= e(level_above($levels, $cur)['name']) ?>.</p><?php endif; ?>
     <?php if ($parentLv && !$parents): ?><p class="flash warn">Add <?= e($parentLv['name']) ?> codes first.</p><?php endif; ?>
     <div class="actions"><button class="btn"><?= $edit ? 'Save changes' : 'Add code' ?></button><?php if ($edit): ?><a href="?level=<?= $curId ?>">Cancel</a><?php endif; ?></div>
   </form>
