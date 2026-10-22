@@ -23,13 +23,16 @@ function is_demo_account(array $u): bool { return str_ends_with((string)$u['emai
 /** Reset once per day, on the first visit after midnight */
 function demo_reset_if_due(): void {
     $today = date('Y-m-d');
-    if (setting('demo_reset_on') === $today) return;
+    // also reload right away when a new version changed the database, so new sample data shows up
+    $due = setting('demo_reset_on') !== $today || setting('demo_seed_version') !== (string)SCHEMA_VERSION;
+    if (!$due) return;
     $pdo = db();
     if (!(int)$pdo->query("SELECT GET_LOCK('erp_demo_reset', 10)")->fetchColumn()) return;
     try {
-        if (setting('demo_reset_on') !== $today) {
+        if (setting('demo_reset_on') !== $today || setting('demo_seed_version') !== (string)SCHEMA_VERSION) {
             demo_seed($pdo);
             set_setting('demo_reset_on', $today);
+            set_setting('demo_seed_version', (string)SCHEMA_VERSION);
             session_regenerate_id(true);
             unset($_SESSION['uid']);
         }
