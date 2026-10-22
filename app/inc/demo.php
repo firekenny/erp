@@ -308,6 +308,18 @@ function demo_seed(PDO $pdo): void {
         }
     }
 
+    // Depreciation (straight-line) and an asset count in progress
+    $pdo->exec("INSERT INTO settings (k, v) VALUES ('dep_method', 'straight') ON DUPLICATE KEY UPDATE v = VALUES(v)");
+    foreach (['IT' => [3, 0], 'TEL' => [3, 0], 'VEH' => [5, 20], 'GEN' => [5, 10], 'FURN' => [7, 0], 'APPL' => [5, 0], 'MED' => [5, 0], 'TOOL' => [5, 0], 'CAM' => [3, 0]] as $cc => [$life, $resid]) {
+        $pdo->prepare('UPDATE categories SET useful_life = ?, residual_pct = ? WHERE code = ?')->execute([$life, $resid, $cc]);
+    }
+    $cntId = $ins("INSERT INTO asset_counts (number, name, created_by, created_at) VALUES (?, ?, ?, ?)", ["AC-$year-0001", "Annual asset count $year", $uid['storekeeper'], date('Y-m-d H:i:s', strtotime('-1 day'))]);
+    $tN = $ins('INSERT INTO asset_count_teams (count_id, name, token) VALUES (?, ?, ?)', [$cntId, 'Team Nairobi', bin2hex(random_bytes(24))]);
+    $ins('INSERT INTO asset_count_teams (count_id, name, token) VALUES (?, ?, ?)', [$cntId, 'Team Lodwar', bin2hex(random_bytes(24))]);
+    $ins('INSERT INTO asset_count_lines (count_id, team_id, asset_id, location_id, employee_id, cond) VALUES (?, ?, ?, ?, ?, ?)', [$cntId, $tN, $aIds['AS-IT-0001'], $locId('Nairobi office'), $empId('Grace Wanjiru'), 'good']);
+    $ins('INSERT INTO asset_count_lines (count_id, team_id, asset_id, location_id, employee_id, cond, note) VALUES (?, ?, ?, ?, ?, ?, ?)', [$cntId, $tN, $aIds['AS-IT-0002'], $locId('Nairobi office'), $empId('David Kiprono'), 'fair', 'Now used by David; screen scratched']);
+    $ins('INSERT INTO asset_count_lines (count_id, team_id, location_id, cond, note, new_description, new_serial) VALUES (?, ?, ?, ?, ?, ?, ?)', [$cntId, $tN, $locId('Nairobi office'), 'good', 'Meeting room', 'Projector Epson EB-X49', 'X4Q8812']);
+
     // A stock request waiting for the storekeeper
     $srId = $ins("INSERT INTO stock_requests (number, requester_id, warehouse_id, issue_to, destination, purpose, needed_by, created_at) VALUES (?, ?, ?, 'Rita Requester', 'Kakuma distribution point', 'Monthly hygiene distribution, 50 households', ?, ?)",
         ["SR-$year-0001", $uid['requester'], $whId('LOD'), date('Y-m-d', strtotime('+3 days')), date('Y-m-d H:i:s', strtotime('-1 day'))]);

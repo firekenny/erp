@@ -6,7 +6,7 @@ declare(strict_types=1);
  * After each deploy, the app upgrades the database by itself on the next page load —
  * no manual SQL needed.
  */
-const SCHEMA_VERSION = 10;
+const SCHEMA_VERSION = 11;
 
 function schema_migrations(): array {
     return [
@@ -634,6 +634,44 @@ function schema_migrations(): array {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
             "INSERT INTO asset_events (asset_id, event, details, ref_type, ref_id, created_at)
              SELECT a.id, 'received', CONCAT('Received on ', g.number), 'grn', g.id, a.created_at FROM assets a JOIN grn_lines gl ON gl.id = a.grn_line_id JOIN grn g ON g.id = gl.grn_id",
+        ],
+        11 => [
+            "ALTER TABLE categories ADD COLUMN useful_life DECIMAL(5,2) NULL, ADD COLUMN residual_pct DECIMAL(5,2) NOT NULL DEFAULT 0",
+            "CREATE TABLE IF NOT EXISTS asset_counts (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                number VARCHAR(40) NOT NULL UNIQUE,
+                name VARCHAR(160) NOT NULL,
+                location_id INT NULL,
+                status ENUM('open','closed') NOT NULL DEFAULT 'open',
+                created_by INT NOT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                closed_at DATETIME NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS asset_count_teams (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                count_id INT NOT NULL,
+                name VARCHAR(120) NOT NULL,
+                token CHAR(48) NOT NULL UNIQUE,
+                KEY ix_c (count_id),
+                CONSTRAINT fk_act_c FOREIGN KEY (count_id) REFERENCES asset_counts(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS asset_count_lines (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                count_id INT NOT NULL,
+                team_id INT NOT NULL,
+                asset_id INT NULL,
+                location_id INT NULL,
+                employee_id INT NULL,
+                holder_text VARCHAR(160) NOT NULL DEFAULT '',
+                cond VARCHAR(10) NOT NULL DEFAULT '',
+                note VARCHAR(500) NOT NULL DEFAULT '',
+                new_description VARCHAR(255) NOT NULL DEFAULT '',
+                new_serial VARCHAR(120) NOT NULL DEFAULT '',
+                new_tag VARCHAR(60) NOT NULL DEFAULT '',
+                counted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY ix_c (count_id), KEY ix_a (asset_id),
+                CONSTRAINT fk_acl_c FOREIGN KEY (count_id) REFERENCES asset_counts(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         ],
     ];
 }

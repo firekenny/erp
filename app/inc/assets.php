@@ -59,3 +59,36 @@ function handover_send(array $h): string {
     q('UPDATE handovers SET email_status = ? WHERE id = ?', [mb_substr($st, 0, 250), $h['id']]);
     return $st;
 }
+
+/* ---------- Depreciation ---------- */
+const DEP_METHODS = ['none' => 'No depreciation', 'straight' => 'Straight-line', 'reducing' => 'Reducing balance'];
+
+/**
+ * Depreciation of one asset at a date. Monthly, starting with the purchase month.
+ * Returns ['months' => n, 'acc' => accumulated depreciation, 'nbv' => net book value, 'note' => ''].
+ * $cat needs useful_life (years) and residual_pct.
+ */
+function asset_depreciation(array $a, string $asOf, array $cat, ?string $method = null): array {
+    $method ??= setting('dep_method', 'none');
+    $cost = (float)$a['purchase_value'];
+    $res = ['months' => 0, 'acc' => 0.0, 'nbv' => $cost, 'note' => ''];
+    if ($method === 'none') return $res;
+    $life = (float)($cat['useful_life'] ?? 0);
+    if ($life <= 0) { $res['note'] = 'no useful life set for the category'; return $res; }
+    if (!$a['purchase_date']) { $res['note'] = 'no purchase date'; return $res; }
+    $end = $asOf;
+    if (!empty($a['disposed_at']) && $a['disposed_at'] < $end) $end = $a['disposed_at'];
+    if ($a['purchase_date'] > $end) return $res;
+    [$py, $pm] = array_map('intval', explode('-', substr($a['purchase_date'], 0, 7)));
+    [$ey, $em] = array_map('intval', explode('-', substr($end, 0, 7)));
+    $months = ($ey - $py) * 12 + ($em - $pm) + 1;
+    $lifeM = (int)round($life * 12);
+    $residual = $cost * (float)($cat['residual_pct'] ?? 0) / 100;
+    if ($months >= $lifeM) { $nbv = $residual; }
+    elseif ($method === 'straight') { $nbv = $cost - ($cost - $residual) * $months / $lifeM; }
+    else {
+        $rate = $residual > 0 ? 1 - pow($residual / $cost, 1 / $life) : min(1, 2 / $life);   // reducing balance: reach the residual at end of life (double rate if none)
+        $nbv = max($residual, $cost * pow(1 - $rate, $months / 12));
+    }
+    return ['months' => min($months, $lifeM), 'acc' => round($cost - $nbv, 2), 'nbv' => round($nbv, 2), 'note' => ''];
+}

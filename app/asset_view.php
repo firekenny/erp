@@ -61,6 +61,8 @@ render_header($a['code']); ?>
     <div><span class="muted">Bought</span><br><?= $a['purchase_date'] ? e(date('d M Y', strtotime($a['purchase_date']))) : '—' ?> · <?= number_format((float)$a['purchase_value'], 2) ?> <?= e($a['currency']) ?></div>
     <div><span class="muted">Supplier · PO</span><br><?= e($a['supplier_name'] ?? '—') ?><?= $a['po_id'] ? ' · <a href="po_view.php?id=' . (int)$a['po_id'] . '">' . e($a['po_number']) . '</a>' : '' ?></div>
     <div><span class="muted">Funding</span><br><?= e(fin_label($a, $codes)) ?: '—' ?></div>
+    <?php if (setting('dep_method', 'none') !== 'none'): $dep = asset_depreciation($a, date('Y-m-d'), q('SELECT useful_life, residual_pct FROM categories WHERE id = ?', [$a['category_id']])->fetch() ?: []); ?>
+    <div><span class="muted">Net book value today</span><br><b><?= number_format($dep['nbv'], 2) ?></b> <?= e($a['currency']) ?><?= $dep['note'] ? ' <span class="tag warn">' . e($dep['note']) . '</span>' : '' ?></div><?php endif; ?>
   </div>
   <?php if ($a['status'] === 'disposed'): ?><p class="flash warn" style="margin:10px 0 0">Disposed on <?= e(date('d M Y', strtotime($a['disposed_at']))) ?>: <?= e($a['disposal_method']) ?><?= $a['disposal_value'] !== null ? ' · ' . number_format((float)$a['disposal_value'], 2) : '' ?> · <?= e($a['disposal_note']) ?></p><?php endif; ?>
 </div>

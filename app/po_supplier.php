@@ -17,7 +17,7 @@ if ($po && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['act'] ?? '') === 'a
 }
 ?><!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">
-<title><?= $po ? e($po['number']) : 'Purchase Order' ?></title><link rel="stylesheet" href="assets/style.css?v=7"></head><body>
+<title><?= $po ? e($po['number']) : 'Purchase Order' ?></title><link rel="stylesheet" href="assets/style.css?v=8"></head><body>
 <?php if (is_demo()): ?><div class="demo-bar">Demo version · this is the page a supplier sees when opening their Purchase Order link</div><?php endif; ?>
 <header class="topbar noprint"><span class="brand"><?= e(setting('org_name')) ?></span><span class="who">Purchase Order</span></header>
 <main style="max-width:980px;margin:0 auto">

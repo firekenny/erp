@@ -1,6 +1,7 @@
 <?php
 require __DIR__ . '/inc/bootstrap.php';
 require_once __DIR__ . '/inc/assets.php';
+require_once __DIR__ . '/inc/xlsx.php';
 require_any(['storekeeper', 'procurement', 'admin']);
 $canEdit = has_role('storekeeper') || has_role('admin');
 
@@ -25,10 +26,10 @@ $rows = q('SELECT a.*, l.name AS loc_name, e.name AS emp_name, c.code AS cat_cod
 $codes = fin_code_map();
 
 if (isset($_GET['export'])) {
-    send_csv('asset_register_' . date('Y-m-d') . '.csv',
-        ['asset_id', 'description', 'category', 'brand_model', 'serial_no', 'purchase_date', 'purchase_value', 'currency', 'funding', 'location', 'held_by', 'condition', 'status', 'po'],
-        array_map(fn($a) => [$a['code'], $a['description'], $a['cat_code'], $a['brand_model'], $a['serial_no'], $a['purchase_date'], (float)$a['purchase_value'], $a['currency'],
-            fin_label($a, $codes), $a['loc_name'] ?? $a['location'], $a['emp_name'] ?? '', ASSET_COND[$a['cond']] ?? $a['cond'], ASSET_STATUS[$a['status']][0], (string)($a['po_id'] ? q('SELECT number FROM po WHERE id = ?', [$a['po_id']])->fetchColumn() : '')], $rows));
+    xlsx_send('asset_register_' . date('Y-m-d') . '.xlsx', [['name' => 'Asset register',
+        'header' => ['Asset ID', 'Description', 'Category', 'Brand / model', 'Serial', 'Purchase date', 'Purchase value', 'Currency', 'Funding', 'Location', 'Held by', 'Condition', 'Status', 'PO'],
+        'rows' => array_map(fn($a) => [$a['code'], $a['description'], $a['cat_code'], $a['brand_model'], $a['serial_no'], $a['purchase_date'], round((float)$a['purchase_value'], 2), $a['currency'],
+            fin_label($a, $codes), $a['loc_name'] ?? $a['location'], $a['emp_name'] ?? '', ASSET_COND[$a['cond']] ?? $a['cond'], ASSET_STATUS[$a['status']][0], (string)($a['po_id'] ? q('SELECT number FROM po WHERE id = ?', [$a['po_id']])->fetchColumn() : '')], $rows)]]);
 }
 
 $cats = q('SELECT DISTINCT c.id, c.code, c.name FROM categories c JOIN assets a ON a.category_id = c.id ORDER BY c.code')->fetchAll();
@@ -40,7 +41,7 @@ $total = array_sum(array_map(fn($a) => (float)$a['purchase_value'], $rows));
 render_header('Asset register'); ?>
 <div class="actions" style="margin:0 0 12px">
   <?php if ($canEdit): ?><a class="btn sec small" href="assets_import.php">Import existing register</a><a class="btn sec small" href="handovers.php">Handovers<?= $unsigned ? " ($unsigned unsigned)" : '' ?></a><?php endif; ?>
-  <a class="btn sec small" style="margin-left:auto" href="?<?= e(http_build_query($_GET + ['export' => 1])) ?>">Export to Excel (CSV)</a>
+  <a class="btn sec small" style="margin-left:auto" href="?<?= e(http_build_query($_GET + ['export' => 1])) ?>">Export to Excel</a>
 </div>
 <form method="get" class="card" style="padding:12px">
   <div class="row" style="align-items:flex-end">

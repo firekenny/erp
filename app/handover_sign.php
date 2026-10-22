@@ -19,7 +19,7 @@ if ($h && $_SERVER['REQUEST_METHOD'] === 'POST' && !$h['signed_at']) {
 }
 ?><!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">
-<title>Equipment handover</title><link rel="stylesheet" href="assets/style.css?v=7"></head><body>
+<title>Equipment handover</title><link rel="stylesheet" href="assets/style.css?v=8"></head><body>
 <?php if (is_demo()): ?><div class="demo-bar">Demo version · this is the page a staff member sees when opening their handover link</div><?php endif; ?>
 <header class="topbar"><span class="brand"><?= e(setting('org_name')) ?></span><span class="who">Equipment handover</span></header>
 <main style="max-width:900px;margin:0 auto">

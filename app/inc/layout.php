@@ -41,6 +41,8 @@ function render_header(string $title): void {
             $nav[] = ['Asset register', 'assets.php'];
             $nUns = (int)q("SELECT COUNT(*) FROM handovers WHERE type = 'handover' AND signed_at IS NULL")->fetchColumn();
             $nav[] = ['Handovers' . ($nUns ? " ($nUns)" : ''), 'handovers.php'];
+            if (has_role('storekeeper') || has_role('admin')) $nav[] = ['Asset counts', 'asset_counts.php'];
+            $nav[] = ['Depreciation', 'depreciation.php'];
             if (has_role('storekeeper') || has_role('admin')) { $nav[] = ['Staff', 'employees.php']; $nav[] = ['Asset locations', 'locations.php']; }
         }
         if (has_role('admin')) {
@@ -62,7 +64,7 @@ function render_header(string $title): void {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= e($title) ?> · <?= e($org) ?></title>
-<link rel="stylesheet" href="assets/style.css?v=7">
+<link rel="stylesheet" href="assets/style.css?v=8">
 </head>
 <body>
 <?php if (function_exists('is_demo') && is_demo()): ?>
