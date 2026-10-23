@@ -121,10 +121,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     if ($act === 'quote' && $rfq['status'] === 'open' && !$rfq['sealed']) {
         $sid = (int)($_POST['supplier_id'] ?? 0);
-        if (!q("SELECT 1 FROM suppliers WHERE id = ? AND status = 'active'", [$sid])->fetch()) { flash('Choose a supplier.', 'err'); $back(); }
+        if (!q("SELECT 1 FROM rfq_suppliers rs JOIN suppliers s ON s.id = rs.supplier_id WHERE rs.rfq_id = ? AND rs.supplier_id = ? AND s.status = 'active'", [$id, $sid])->fetch()) { flash('Choose one of the suppliers invited to this RFQ.', 'err'); $back(); }
         $prices = (array)($_POST['price'] ?? []);
         if (!array_filter($prices, fn($p) => trim((string)$p) !== '')) { flash('Enter at least one price.', 'err'); $back(); }
-        q('INSERT IGNORE INTO rfq_suppliers (rfq_id, supplier_id, invited_at) VALUES (?, ?, NOW())', [$id, $sid]);
         $num = fn($k) => ($v = trim((string)($_POST[$k] ?? ''))) === '' ? null : max(0, (int)$v);
         rfq_save_quote($rfq, $sid, $prices, (array)($_POST['remark'] ?? []), $num('delivery_days'), $num('validity_days'), trim((string)($_POST['notes'] ?? '')), (int)$u['id']);
         rfq_log($id, 'quote entered', q('SELECT name FROM suppliers WHERE id = ?', [$sid])->fetchColumn(), $sid);
@@ -316,14 +315,16 @@ if ($visible && $quotes):
 
 <?php /* ---------- Officer quote entry (non-sealed) ---------- */
 if ($rfq['status'] === 'open' && !$rfq['sealed']):
-    $entrySups = $candidates; ?>
+    $entrySups = array_map(fn($x) => ['id' => (int)$x['supplier_id'], 'name' => $x['name']], array_filter($sups, fn($x) => $x['sup_status'] === 'active')); ?>
 <div class="card noprint">
   <h2>Enter a quote received</h2>
   <form method="post">
     <?= csrf_field() ?><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="act" value="quote">
     <label>Supplier</label>
+    <?php if (!$entrySups): ?><p class="flash warn">No supplier is invited to this RFQ yet: add them above first.</p><?php endif; ?>
     <select name="supplier_id" required><option value="">— select —</option>
       <?php foreach ($entrySups as $c): ?><option value="<?= (int)$c['id'] ?>"><?= e($c['name']) ?><?= isset($quotes[(int)$c['id']]) ? ' (quote saved: entering again replaces it)' : '' ?></option><?php endforeach; ?></select>
+    <p class="muted" style="margin:4px 0 0">Only the suppliers invited to this RFQ are listed. A quote from another supplier? Add the supplier above first (it is recorded in the history).</p>
     <div class="table-wrap" style="margin-top:10px"><table>
       <tr><th>#</th><th>Item</th><th style="text-align:right">Qty</th><th>Unit price (<?= e($rfq['currency']) ?>)</th><th>Remarks</th></tr>
       <?php foreach ($lines as $l): ?>
