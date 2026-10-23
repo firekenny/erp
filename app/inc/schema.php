@@ -6,7 +6,7 @@ declare(strict_types=1);
  * After each deploy, the app upgrades the database by itself on the next page load —
  * no manual SQL needed.
  */
-const SCHEMA_VERSION = 14;
+const SCHEMA_VERSION = 15;
 
 function schema_migrations(): array {
     return [
@@ -752,6 +752,9 @@ function schema_migrations(): array {
                 updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 UNIQUE KEY uq_ab (a_value_id, b_value_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        ],
+        15 => [
+            "ALTER TABLE users ADD COLUMN ms_oid VARCHAR(64) NULL, ADD UNIQUE KEY uq_ms_oid (ms_oid)",
         ],
     ];
 }

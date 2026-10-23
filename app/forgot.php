@@ -1,5 +1,6 @@
 <?php
 require __DIR__ . '/inc/bootstrap.php';
+require_once __DIR__ . '/inc/sso.php';
 if (current_user()) redirect('index.php');
 if (is_demo()) redirect('login.php');
 
@@ -7,7 +8,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = strtolower(trim((string)($_POST['email'] ?? '')));
     $recent = (int)q("SELECT COUNT(*) FROM audit_log WHERE action = 'password.reset_request' AND details LIKE CONCAT(?, ' —%') AND created_at > NOW() - INTERVAL 15 MINUTE", [$email])->fetchColumn();
     $u = q('SELECT * FROM users WHERE email = ? AND active = 1', [$email])->fetch();
-    $result = !$u ? 'no active account with this email' : ($recent >= 3 ? 'blocked: too many requests in 15 min' : (!mail_configured() ? 'email not set up' : ''));
+    $result = $u && !sso_password_allowed($u) ? 'not sent: this user signs in with Microsoft' : (!$u ? 'no active account with this email' : ($recent >= 3 ? 'blocked: too many requests in 15 min' : (!mail_configured() ? 'email not set up' : '')));
     if ($result === '') {
         $t = bin2hex(random_bytes(24));
         q('UPDATE users SET invite_token = ?, invite_expires = DATE_ADD(NOW(), INTERVAL 1 HOUR) WHERE id = ?', [$t, $u['id']]);

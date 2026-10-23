@@ -80,6 +80,7 @@ render_header($demo ? 'User guide (demo)' : 'User guide'); ?>
   <h3>Signing in</h3>
   <ul>
     <li>Your Administrator creates your account and sends you an <b>access link</b>. Open it and choose your password (at least 8 characters).</li>
+    <li>If your organisation uses Microsoft 365, click <b>Sign in with Microsoft</b> and use your work account (with Microsoft's 2-step verification). Your Administrator must have added you with the same email address.</li>
     <li>Forgot your password? Click <b>Forgot your password?</b> on the sign-in page. A link valid for 1 hour is emailed to you.</li>
     <li>Click your name at the top right (<b>My account</b>) to change your password or switch off email notifications.</li>
   </ul>
@@ -111,6 +112,7 @@ render_header($demo ? 'User guide (demo)' : 'User guide'); ?>
   <p>Do it once, in this order. The Dashboard shows a checklist until the essentials are done.</p>
   <ol>
     <li><b>Organisation</b>: name, currency, address (printed on POs), document prefixes, payment terms and PO terms &amp; conditions, the <b>tolerance %</b> (how much an award may exceed the PR estimate, and an invoice price may exceed the PO price), the asset code prefix, automatic sign-out time.</li>
+    <li><b>Microsoft sign-in</b> (optional): staff sign in with their Microsoft 365 account and its 2-step verification. Register the app in Microsoft Entra, paste the tenant ID, client ID and secret, and choose whether passwords remain allowed (administrators always keep theirs for emergencies).</li>
     <li><b>Email settings</b>: the mailbox the ERP sends from (SMTP server, port, user, password). Click <b>Send a test email to me</b>. Without this, no notification, supplier invitation or password reset is sent.</li>
     <li><b>Users &amp; roles</b>: add each user with their roles. <b>Add user and create access link</b> emails the link, or shows it so you can copy it.</li>
     <li><b>Finance codes</b>: create up to 4 coding levels (typically <i>Donor → Cost centre → Budget line</i>).

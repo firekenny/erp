@@ -57,6 +57,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             audit('user.toggle', "#$id");
             flash('User status changed.');
         }
+    } elseif ($act === 'unlink_ms' && $id) {
+        q('UPDATE users SET ms_oid = NULL WHERE id = ?', [$id]);
+        audit('user.unlink_microsoft', "#$id");
+        flash('Microsoft account unlinked: the next Microsoft sign-in with this email links it again.');
     } elseif ($act === 'link' && $id) {
         $u = q('SELECT name FROM users WHERE id = ? AND active = 1', [$id])->fetch();
         if ($u) {
@@ -122,12 +126,16 @@ if ($link): ?>
     </td>
     <td>
       <?php if (!$u['active']): ?><span class="tag off">Deactivated</span>
-      <?php elseif (!$u['password_hash']): ?><span class="tag">Link sent, not used yet</span>
+      <?php elseif (!$u['password_hash'] && empty($u['ms_oid'])): ?><span class="tag">Link sent, not used yet</span>
       <?php else: ?><span class="tag stock">Active</span><?php endif; ?>
+      <?php if (!empty($u['ms_oid'])): ?><span class="tag">Microsoft</span><?php endif; ?>
     </td>
     <td style="white-space:nowrap">
       <?php if ($u['active']): ?>
       <form method="post" style="display:inline"><?= csrf_field() ?><input type="hidden" name="act" value="link"><input type="hidden" name="id" value="<?= (int)$u['id'] ?>"><button class="btn sec small">New access link</button></form>
+      <?php endif; ?>
+      <?php if (!empty($u['ms_oid'])): ?>
+      <form method="post" style="display:inline" onsubmit="return confirm('Unlink this person\'s Microsoft account? Use this if their Microsoft account was recreated.')"><?= csrf_field() ?><input type="hidden" name="act" value="unlink_ms"><input type="hidden" name="id" value="<?= (int)$u['id'] ?>"><button class="btn sec small">Unlink Microsoft</button></form>
       <?php endif; ?>
       <?php if ((int)$u['id'] !== (int)$me['id']): ?>
       <form method="post" style="display:inline" onsubmit="return confirm('Change this user\'s status?')"><?= csrf_field() ?><input type="hidden" name="act" value="toggle"><input type="hidden" name="id" value="<?= (int)$u['id'] ?>"><button class="btn sec small"><?= $u['active'] ? 'Deactivate' : 'Reactivate' ?></button></form>

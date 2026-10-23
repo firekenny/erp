@@ -1,5 +1,6 @@
 <?php
 require __DIR__ . '/inc/bootstrap.php';
+require_once __DIR__ . '/inc/sso.php';
 
 if (current_user()) redirect('index.php');
 
@@ -32,6 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $u = q('SELECT * FROM users WHERE email = ? AND active = 1', [$email])->fetch();
     if ($u && $u['password_hash'] && password_verify($pw, $u['password_hash'])) {
+        if (!sso_password_allowed($u)) { flash('Please use "Sign in with Microsoft" with your work account.', 'warn'); redirect('login.php'); }
         session_regenerate_id(true);
         $_SESSION['uid'] = (int)$u['id'];
         $_SESSION['last_seen'] = time();
@@ -63,9 +65,17 @@ if (is_demo()): ?>
   </form>
 </div>
 <?php render_footer(); exit; endif; ?>
+<?php if (sso_enabled()): ?>
+<div class="card" style="text-align:center">
+  <a class="btn" href="sso_start.php" style="display:inline-flex;align-items:center;gap:10px;padding:10px 18px">
+    <svg width="18" height="18" viewBox="0 0 21 21" aria-hidden="true"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
+    Sign in with Microsoft</a>
+  <p class="muted" style="margin-bottom:0"><?= setting('sso_password_mode') === 'admins' ? 'Use your work account. Administrators can also sign in with their password below.' : 'Or sign in with your email and password below.' ?></p>
+</div>
+<?php endif; ?>
 <form method="post" class="card">
   <?= csrf_field() ?>
-  <label>Email</label><input type="email" name="email" value="<?= e($email) ?>" required autofocus>
+  <label>Email</label><input type="email" name="email" value="<?= e($email) ?>" required <?= sso_enabled() ? '' : 'autofocus' ?>>
   <label>Password</label><input type="password" name="password" required>
   <div class="actions"><button class="btn">Sign in</button></div>
   <p class="muted"><a href="forgot.php">Forgot your password?</a> · <a href="help.php">User guide</a></p>

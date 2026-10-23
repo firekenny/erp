@@ -62,6 +62,7 @@ function render_header(string $title): void {
             $nav[] = ['Approval thresholds', 'approvals.php'];
             $nav[] = ['Procurement methods', 'methods.php'];
             $nav[] = ['Email settings', 'email_settings.php'];
+            $nav[] = ['Microsoft sign-in', 'sso_settings.php'];
             $nav[] = ['Audit log', 'audit.php'];
             $nav[] = ['Item categories', 'categories.php'];
             $nav[] = ['Item catalogue', 'items.php'];
