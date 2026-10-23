@@ -38,12 +38,17 @@ render_header($demo ? 'User guide (demo)' : 'User guide'); ?>
 .help .flow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:10px 0}
 .help .flow span{background:#f0f3f6;border-radius:6px;padding:5px 10px;font-size:14px}
 .help .flow i{color:#8a96a3;font-style:normal}
+.help mark{background:#ffe08a;color:inherit;padding:0 1px;border-radius:2px}
+.help mark.cur{background:#ffb400}
+.help nav.toc a.off{display:none}
 .help kbd{background:#f0f3f6;border:1px solid #d5dce3;border-radius:4px;padding:0 5px;font-family:inherit;font-size:13px}
 @media (max-width:800px){.help{display:block}.help nav.toc{position:static;max-height:none;margin-bottom:14px}}
 @media print{.help nav.toc{display:none}.help section{break-inside:avoid-page;border:0}}
 </style>
 <div class="help">
 <nav class="toc noprint"><b><?= $demo ? 'Demo guide' : 'User guide' ?></b>
+  <input type="search" id="hq" placeholder="Search the guide…" autocomplete="off" aria-label="Search the guide" style="margin:8px 0 4px">
+  <div id="hn" class="muted" style="font-size:13px;min-height:18px"></div>
   <?php foreach ($sections as $k => $t): ?><a href="#<?= $k ?>"><?= e($t) ?></a><?php endforeach; ?>
   <p class="muted" style="margin-bottom:0"><a href="#" onclick="window.print();return false">Print / save as PDF</a><?= current_user() ? '' : '<a href="login.php">Sign in</a>' ?></p>
 </nav>
@@ -334,4 +339,54 @@ render_header($demo ? 'User guide (demo)' : 'User guide'); ?>
 </section>
 </div>
 </div>
+<script>
+(() => {
+  const q = document.getElementById('hq'), note = document.getElementById('hn');
+  const secs = [...document.querySelectorAll('.help .body section')];
+  const links = [...document.querySelectorAll('.help nav.toc a[href^="#"]')];
+  const norm = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const orig = new Map(secs.map(s => [s, s.innerHTML]));
+  let t;
+  function run() {
+    const raw = q.value.trim(), term = norm(raw);
+    secs.forEach(s => { s.innerHTML = orig.get(s); s.style.display = ''; });
+    links.forEach(a => a.classList.remove('off'));
+    if (term.length < 2) { note.textContent = ''; return; }
+    let hits = 0, shown = 0;
+    secs.forEach(s => {
+      const walker = document.createTreeWalker(s, NodeFilter.SHOW_TEXT);
+      const nodes = []; while (walker.nextNode()) nodes.push(walker.currentNode);
+      let found = 0;
+      nodes.forEach(n => {
+        const txt = n.nodeValue, low = norm(txt); let i = low.indexOf(term);
+        if (i < 0) return;
+        const frag = document.createDocumentFragment(); let last = 0;
+        while (i >= 0) {
+          frag.appendChild(document.createTextNode(txt.slice(last, i)));
+          const m = document.createElement('mark'); m.textContent = txt.slice(i, i + term.length); frag.appendChild(m);
+          last = i + term.length; found++; i = low.indexOf(term, last);
+        }
+        frag.appendChild(document.createTextNode(txt.slice(last)));
+        n.parentNode.replaceChild(frag, n);
+      });
+      const link = links.find(a => a.getAttribute('href') === '#' + s.id);
+      if (found) { shown++; hits += found; } else { s.style.display = 'none'; if (link) link.classList.add('off'); }
+    });
+    note.textContent = hits ? hits + ' match' + (hits > 1 ? 'es' : '') + ' in ' + shown + ' section' + (shown > 1 ? 's' : '') + ' · Enter = next' : 'No match for "' + raw + '"';
+    idx = -1;
+  }
+  let idx = -1;
+  q.addEventListener('input', () => { clearTimeout(t); t = setTimeout(run, 150); });
+  q.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { q.value = ''; run(); }
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const ms = [...document.querySelectorAll('.help .body mark')]; if (!ms.length) return;
+    ms.forEach(m => m.classList.remove('cur'));
+    idx = (idx + (e.shiftKey ? -1 : 1) + ms.length) % ms.length;
+    ms[idx].classList.add('cur'); ms[idx].scrollIntoView({behavior: 'smooth', block: 'center'});
+  });
+  document.addEventListener('keydown', e => { if (e.key === '/' && document.activeElement !== q && !/input|textarea|select/i.test(document.activeElement.tagName)) { e.preventDefault(); q.focus(); } });
+})();
+</script>
 <?php render_footer();
