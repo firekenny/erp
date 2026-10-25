@@ -42,7 +42,7 @@ $already = array_map('intval', array_filter(array_column($mine, 'asset_id')));
 $opts = function (array $list, ?int $sel, string $empty) { $h = '<option value="0">' . e($empty) . '</option>'; foreach ($list as $x) $h .= '<option value="' . (int)$x['id'] . '"' . ((int)$sel === (int)$x['id'] ? ' selected' : '') . '>' . e($x['name']) . '</option>'; return $h; };
 ?><!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">
-<title>Asset count</title><link rel="stylesheet" href="assets/style.css?v=8"></head><body>
+<title>Asset count</title><link rel="stylesheet" href="assets/style.css?v=9"></head><body>
 <?php if (is_demo()): ?><div class="demo-bar">Demo version · this is the page a counting team opens on its phone</div><?php endif; ?>
 <header class="topbar"><span class="brand"><?= e(setting('org_name')) ?></span><span class="who"><?= $team ? e($team['name']) : 'Asset count' ?></span></header>
 <main style="max-width:640px;margin:0 auto">
