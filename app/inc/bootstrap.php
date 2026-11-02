@@ -7,8 +7,10 @@ define('APP_VERSION', '0.9 (+ notifications and security)');
 require __DIR__ . '/headers.php';
 send_security_headers();
 
-session_set_cookie_params(['httponly' => true, 'samesite' => 'Lax', 'secure' => !empty($_SERVER['HTTPS']) || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https')]);
-session_name('erp_session');
+$isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+session_set_cookie_params(['path' => '/', 'httponly' => true, 'samesite' => 'Lax', 'secure' => $isHttps]);
+// "__Host-" prefix: the browser only accepts this cookie over https, for this exact site
+session_name($isHttps ? '__Host-erp_session' : 'erp_session');
 session_start();
 
 if (!file_exists(APP_ROOT . '/config.php')) {
