@@ -4,7 +4,10 @@ declare(strict_types=1);
 define('APP_ROOT', dirname(__DIR__));
 define('APP_VERSION', '0.9 (+ notifications and security)');
 
-session_set_cookie_params(['httponly' => true, 'samesite' => 'Lax', 'secure' => !empty($_SERVER['HTTPS'])]);
+require __DIR__ . '/headers.php';
+send_security_headers();
+
+session_set_cookie_params(['httponly' => true, 'samesite' => 'Lax', 'secure' => !empty($_SERVER['HTTPS']) || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https')]);
 session_name('erp_session');
 session_start();
 

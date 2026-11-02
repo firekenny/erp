@@ -7,6 +7,8 @@ declare(strict_types=1);
  */
 session_start();
 $root = __DIR__;
+require $root . '/inc/headers.php';
+send_security_headers();
 require $root . '/inc/schema.php';
 require $root . '/inc/demo.php';
 

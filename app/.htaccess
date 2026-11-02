@@ -9,3 +9,4 @@ RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 <Files "config.php">
   Require all denied
 </Files>
+
